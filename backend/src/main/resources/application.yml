@@ -1,0 +1,109 @@
+spring:
+  application:
+    name: ensp-nms
+  profiles:
+    active: dev
+
+snmp:
+  trap:
+    port: ${SNMP_TRAP_PORT:162}
+    # v1/v2c 默认可收；v3 需配置与设备一致的 USM 用户，否则无法解密
+    v3:
+      enabled: true
+      users:
+        - username: ${SNMP_V3_USER:nmsuser}
+          auth-protocol: ${SNMP_V3_AUTH_PROTO:SHA}
+          auth-password: ${SNMP_V3_AUTH_PASS:AuthPass123}
+          priv-protocol: ${SNMP_V3_PRIV_PROTO:AES128}
+          priv-password: ${SNMP_V3_PRIV_PASS:PrivPass123}
+
+# 性能阈值与 AIOps 策略（可按环境覆盖；运行时也可经 /api/aiops/policy 调整）
+nms:
+  performance:
+    thresholds:
+      cpu:
+        warning: ${NMS_CPU_WARN:70}
+        danger: ${NMS_CPU_DANGER:85}
+      memory:
+        warning: ${NMS_MEM_WARN:75}
+        danger: ${NMS_MEM_DANGER:90}
+  # 连通性探测去抖：连续成功才判恢复并自动关闭连通性告警
+  probe:
+    online-after-successes: ${NMS_PROBE_ONLINE_OK:2}
+    offline-after-failures: ${NMS_PROBE_OFFLINE_FAIL:2}
+  # 拓扑链路自动发现（实验室默认开启；eNSP 上常靠 ARP 回退）
+  topology:
+    auto-discover-enabled: ${NMS_TOPO_AUTO_DISCOVER:true}
+    auto-discover-ms: ${NMS_TOPO_AUTO_DISCOVER_MS:300000}
+    auto-discover-only-when-empty: ${NMS_TOPO_AUTO_EMPTY_ONLY:false}
+  # 阅知类 trapType：确认即办结。实验室高频提示/抖动类一并纳入；不含认证失败/离线/冷启动等需跟进项。
+  alarm:
+    ack-closes-types:
+      - 用户管理-用户登录
+      - 用户管理-用户退出
+      - 用户管理-登录退出
+      - 路由告警-OSPF产生LSA
+      - 路由告警-OSPF重传
+      - 路由告警-OSPF触发
+      - 路由告警-OSPF恢复
+      - 路由告警-OSPF-LSA-MaxAge
+      - 路由告警-OSPF状态变更
+      - 路由告警-OSPF邻居状态变更
+      - 交换告警-STP拓扑变更
+      - 接口告警-华为接口变更
+      - 安全告警-802.1X认证
+      - 系统告警-热启动
+      - 厂商事件-华为
+      - 链路告警-接口恢复
+      - 链路告警-BFD恢复
+      - 硬件告警-电源恢复
+      - 硬件告警-风扇恢复
+      - 性能告警-负载恢复
+      - 系统告警-启动完成
+      - 配置告警-配置保存
+  aiops:
+    storm-window-minutes: ${NMS_AIOPS_STORM_WINDOW:10}
+    link-window-minutes: ${NMS_AIOPS_LINK_WINDOW:15}
+    anomaly-lookback-hours: ${NMS_AIOPS_LOOKBACK:24}
+    anomaly-k-sigma: ${NMS_AIOPS_K_SIGMA:2.2}
+    anomaly-min-abs-delta: ${NMS_AIOPS_MIN_DELTA:12}
+    anomaly-suppress-minutes: ${NMS_AIOPS_SUPPRESS:30}
+    analyze-simulated-metrics: ${NMS_AIOPS_ANALYZE_SIM:false}
+    anomaly-min-samples: ${NMS_AIOPS_MIN_SAMPLES:5}
+    auto-ack-secondary: ${NMS_AIOPS_AUTO_ACK_SECONDARY:false}
+    webhook-enabled: ${NMS_AIOPS_WEBHOOK_ENABLED:false}
+    webhook-url: ${NMS_AIOPS_WEBHOOK_URL:}
+    webhook-min-severity: ${NMS_AIOPS_WEBHOOK_MIN_SEV:MAJOR}
+    # LLM 运维模式：manual=人工确认；unattended=安全工具自动执行
+    llm-ops-mode: ${NMS_AIOPS_LLM_OPS_MODE:manual}
+    unattended-max-per-cycle: ${NMS_AIOPS_UNATTENDED_MAX:3}
+    unattended-max-steps: ${NMS_AIOPS_UNATTENDED_STEPS:3}
+    unattended-cooldown-minutes: ${NMS_AIOPS_UNATTENDED_CD:10}
+    unattended-on-correlate: ${NMS_AIOPS_UNATTENDED_ON_CORR:false}
+    unattended-allow-backup: ${NMS_AIOPS_UNATTENDED_BACKUP:false}
+    unattended-paused: ${NMS_AIOPS_UNATTENDED_PAUSED:false}
+    llm-circuit-fail-threshold: ${NMS_AIOPS_LLM_CIRCUIT_FAIL:3}
+    llm-circuit-minutes: ${NMS_AIOPS_LLM_CIRCUIT_MIN:15}
+    unattended-run-retention-days: ${NMS_AIOPS_UNATTENDED_RETENTION:30}
+  llm:
+    enabled: ${NMS_LLM_ENABLED:false}
+    provider: ${NMS_LLM_PROVIDER:ollama}
+    base-url: ${NMS_LLM_BASE_URL:http://127.0.0.1:11434}
+    api-key: ${NMS_LLM_API_KEY:}
+    model: ${NMS_LLM_MODEL:qwen2.5:7b}
+    temperature: ${NMS_LLM_TEMPERATURE:0.3}
+    timeout-seconds: ${NMS_LLM_TIMEOUT:60}
+  # 学校交付授权展示（软提示，不硬锁课堂）
+  license:
+    customer: ${NMS_LICENSE_CUSTOMER:未配置授权客户}
+    expires: ${NMS_LICENSE_EXPIRES:}
+    instance-id: ${NMS_LICENSE_INSTANCE:}
+    sku: ${NMS_LICENSE_SKU:教学标准版}
+
+auth:
+  jwt:
+    # 生产环境请用环境变量 AUTH_JWT_SECRET 覆盖（至少 32 字符）
+    secret: ${AUTH_JWT_SECRET:ensp-nms-dev-jwt-secret-change-me-32b}
+    expiration-ms: 86400000
+  cors:
+    allowed-origins: ${AUTH_CORS_ORIGINS:http://localhost:3000}

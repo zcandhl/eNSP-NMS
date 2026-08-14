@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="fwGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#ff6b6b"/>
+      <stop offset="100%" style="stop-color:#c0392b"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="3" stdDeviation="3" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+  <rect x="18" y="20" width="92" height="88" rx="12" fill="url(#fwGrad)" filter="url(#shadow)"/>
+  <path d="M64 32 L100 56 L64 80 L28 56 Z" fill="none" stroke="#ff9999" stroke-width="3"/>
+  <circle cx="64" cy="56" r="14" fill="#c0392b"/>
+  <path d="M64 46 L64 66 M54 56 L74 56" stroke="white" stroke-width="3" stroke-linecap="round"/>
+  <rect x="26" y="28" width="76" height="10" rx="4" fill="#e74c3c"/>
+  <rect x="26" y="90" width="76" height="10" rx="4" fill="#e74c3c"/>
+  <circle cx="36" cy="95" r="3" fill="#ffcc00"/>
+  <circle cx="48" cy="95" r="3" fill="#4cd964"/>
+  <circle cx="60" cy="95" r="3" fill="#4cd964"/>
+  <circle cx="72" cy="95" r="3" fill="#4cd964"/>
+  <circle cx="84" cy="95" r="3" fill="#4cd964"/>
+</svg>

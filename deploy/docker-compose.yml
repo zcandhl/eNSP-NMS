@@ -1,0 +1,83 @@
+# eNSP NMS Compose 一键栈
+# 用法见 deploy/README.md
+name: ensp-nms
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: ensp-nms-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-ChangeMe_Root_2026}
+      MYSQL_DATABASE: ensp_nms
+      MYSQL_USER: ${DB_USERNAME:-ensp}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-ChangeMe_Db_2026}
+      TZ: Asia/Shanghai
+    volumes:
+      - ensp_nms_mysql:/var/lib/mysql
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --default-authentication-plugin=mysql_native_password
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p\"$$MYSQL_ROOT_PASSWORD\" || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+
+  redis:
+    image: redis:7-alpine
+    container_name: ensp-nms-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - ensp_nms_redis:/data
+
+  backend:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    container_name: ensp-nms-backend
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    environment:
+      SPRING_PROFILES_ACTIVE: delivery
+      SERVER_PORT: 8080
+      DB_URL: jdbc:mysql://mysql:3306/ensp_nms?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false
+      DB_USERNAME: ${DB_USERNAME:-ensp}
+      DB_PASSWORD: ${DB_PASSWORD:-ChangeMe_Db_2026}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      AUTH_JWT_SECRET: ${AUTH_JWT_SECRET:-ensp-nms-change-this-jwt-secret-32b-min}
+      AUTH_CORS_ORIGINS: ${AUTH_CORS_ORIGINS:-http://localhost,http://127.0.0.1}
+      SNMP_TRAP_PORT: 1162
+      NMS_LICENSE_CUSTOMER: ${NMS_LICENSE_CUSTOMER:-示范学校}
+      NMS_LICENSE_EXPIRES: ${NMS_LICENSE_EXPIRES:-}
+      NMS_LICENSE_INSTANCE: ${NMS_LICENSE_INSTANCE:-}
+      NMS_LICENSE_SKU: ${NMS_LICENSE_SKU:-教学标准版}
+      JAVA_OPTS: ${JAVA_OPTS:--Xms256m -Xmx768m}
+      TZ: Asia/Shanghai
+    ports:
+      # SNMP Trap：设备指向管理机 IP:162
+      - "162:1162/udp"
+    # 不对外暴露 8080，统一经前端 Nginx
+
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    container_name: ensp-nms-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "${WEB_PORT:-80}:80"
+
+volumes:
+  ensp_nms_mysql:
+  ensp_nms_redis:

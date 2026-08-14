@@ -1,0 +1,7 @@
+target/
+.idea/
+*.iml
+*.db
+ensp_nms.db
+app/
+**/.DS_Store

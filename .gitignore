@@ -1,0 +1,48 @@
+﻿# Dependencies & build
+node_modules/
+frontend/node_modules/
+backend/target/
+frontend/dist/
+frontend/dist-ssr/
+*.class
+*.jar
+!backend/src/**/lib/*.jar
+*.war
+*.ear
+
+# IDE / OS
+.idea/
+backend/.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db
+.trae/
+
+# Local / secrets / clutter
+环境/
+*.exe
+*.msi
+.env
+.env.*
+!.env.example
+!deploy/.env.example
+deploy/backups/
+deploy/native/*.jar
+deploy/native/web/
+deploy/native/env.ps1
+application-local.yml
+**/application-local.yml
+*.log
+*.db
+backend/ensp_nms.db
+simple-frontend/
+database/
+test_snmp.py
+frontend/vite.config.js.timestamp-*.mjs
+
+# Optional local tooling
+.cursor/
+
+# 商务/商务交付文档（勿提交公开仓库）
+delivery/

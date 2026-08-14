@@ -1,0 +1,41 @@
+# 学校正式交付 profile：Compose / 安装脚本默认使用
+# 启动：SPRING_PROFILES_ACTIVE=delivery
+server:
+  port: ${SERVER_PORT:8080}
+
+spring:
+  datasource:
+    url: ${DB_URL:jdbc:mysql://mysql:3306/ensp_nms?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false}
+    username: ${DB_USERNAME:ensp}
+    password: ${DB_PASSWORD}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  jpa:
+    hibernate:
+      # 首装自动建表；升级大版本前请先备份数据库
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQL8Dialect
+  data:
+    redis:
+      host: ${REDIS_HOST:redis}
+      port: ${REDIS_PORT:6379}
+
+auth:
+  jwt:
+    secret: ${AUTH_JWT_SECRET}
+    expiration-ms: ${AUTH_JWT_EXPIRATION_MS:86400000}
+  cors:
+    # 经 Nginx 同源访问时浏览器不跨域；保留本机与常见访问入口
+    allowed-origins: ${AUTH_CORS_ORIGINS:http://localhost,http://127.0.0.1}
+
+logging:
+  level:
+    root: info
+    com.ensp.nms: info
+
+snmp:
+  trap:
+    # 容器内非特权端口；Compose 映射主机 162 -> 容器 1162
+    port: ${SNMP_TRAP_PORT:1162}
