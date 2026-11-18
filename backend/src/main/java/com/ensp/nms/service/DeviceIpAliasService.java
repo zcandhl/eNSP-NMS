@@ -108,7 +108,7 @@ public class DeviceIpAliasService {
         }
 
         // 先清本设备旧别名，再写入（管理 IP 不进别名表，避免与 device.ip 重复）
-        aliasRepository.deleteByDeviceId(device.getId());
+        aliasRepository.deleteAllByDeviceId(device.getId());
         aliasRepository.flush();
         for (String aliasIp : ips) {
             if (aliasIp.equals(mgmtIp)) {

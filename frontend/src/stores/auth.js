@@ -75,6 +75,13 @@ export const useAuthStore = defineStore('auth', () => {
     token.value = ''
     user.value = null
     persist()
+    // 工程上下文是登录态的附属：退出即清，避免换账号沿用上一个账号的工程
+    try {
+      const { useProjectStore } = await import('./project')
+      useProjectStore().reset()
+    } catch {
+      /* 不阻断登出 */
+    }
     if (tokenSnapshot) {
       try {
         await request.post('/auth/logout', null, {

@@ -84,6 +84,13 @@ public class DeviceCapabilityService {
 
         device.setDeviceType(type.getCode());
         device.setMonitorMode(mode.getCode());
+
+        // AC6005 在 eNSP 中 SSH 服务异常，AC 类设备默认走 telnet；其余默认 SSH
+        if (device.getManagementProtocol() == null || device.getManagementProtocol().isBlank()) {
+            device.setManagementProtocol(type == DeviceType.AC ? "telnet" : "ssh");
+        } else {
+            device.setManagementProtocol(device.getManagementProtocol().trim().toLowerCase());
+        }
     }
 
     /**
@@ -104,7 +111,7 @@ public class DeviceCapabilityService {
             return DeviceType.AP;
         }
         if (blob.contains("wac") || blob.contains("wlan ac") || blob.contains("access controller")
-                || blob.contains("无线控制器")) {
+                || blob.contains("无线控制器") || blob.contains("ac6005") || blob.contains("ac65")) {
             return DeviceType.AC;
         }
         if (blob.contains("router") || blob.contains("路由") || blob.contains("ar22")

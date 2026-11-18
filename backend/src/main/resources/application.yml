@@ -19,6 +19,12 @@ snmp:
 
 # 性能阈值与 AIOps 策略（可按环境覆盖；运行时也可经 /api/aiops/policy 调整）
 nms:
+  # 验收批次的僵尸看门狗：运行超时/线程丢失的批次自动中断，避免永远停在"运行中"
+  acceptance:
+    stale-minutes: ${NMS_ACCEPTANCE_STALE_MIN:30}
+    orphan-grace-seconds: ${NMS_ACCEPTANCE_ORPHAN_GRACE:90}
+    watchdog-ms: ${NMS_ACCEPTANCE_WATCHDOG_MS:60000}
+    watchdog-initial-delay-ms: ${NMS_ACCEPTANCE_WATCHDOG_DELAY:120000}
   performance:
     thresholds:
       cpu:
@@ -31,11 +37,30 @@ nms:
   probe:
     online-after-successes: ${NMS_PROBE_ONLINE_OK:2}
     offline-after-failures: ${NMS_PROBE_OFFLINE_FAIL:2}
-  # 拓扑链路自动发现（实验室默认开启；eNSP 上常靠 ARP 回退）
+  # 空库时是否写入 3 台演示设备（默认关闭：真实库删光设备后重启不应再出现演示设备）
+  seed-demo-devices: ${NMS_SEED_DEMO:false}
+  # 拓扑链路自动发现（实验室默认开启；eNSP 不暴露 LLDP MIB，平台经 SSH 采集 display lldp neighbor）
   topology:
     auto-discover-enabled: ${NMS_TOPO_AUTO_DISCOVER:true}
     auto-discover-ms: ${NMS_TOPO_AUTO_DISCOVER_MS:300000}
     auto-discover-only-when-empty: ${NMS_TOPO_AUTO_EMPTY_ONLY:false}
+    # ARP/MAC 兜底建链：ARP 是三层可达不是直连，开启后会把整网拉成网状假链路（unknown ↔ ? / 1Gbps），
+    # 仅在完全读不到 LLDP 的设备上才需要，默认关闭。
+    arp-fallback-enabled: ${NMS_TOPO_ARP_FALLBACK:false}
+  # SSH 采集默认凭据：设备未登记 SSH 账号时用于拓扑发现等只读查询（与全网运维账号一致）
+  ssh:
+    default-username: ${NMS_SSH_USER:opsadmin}
+    default-password: ${NMS_SSH_PASS:Ops@Campus2026}
+    # SSH 协商超时（TCP+kex+认证）。AC6005 等设备启动/繁忙时握手很慢，4s 会误判为不可达
+    connect-timeout-ms: ${NMS_SSH_CONNECT_TIMEOUT_MS:8000}
+    # 建连前 TCP 端口预检超时，用于区分「端口不通」与「握手超时」
+    tcp-probe-ms: ${NMS_SSH_TCP_PROBE_MS:3000}
+    # 配置备份的连接类失败重试（设备抖动/重启中时自动重试，认证错误不重试）
+    config-retry-attempts: ${NMS_SSH_CFG_RETRY:3}
+    config-retry-delay-ms: ${NMS_SSH_CFG_RETRY_DELAY:2500}
+  # 设备扫描的附加探测 IP：管理地址不在扫描网段的设备（AR-EXPORT 管理地址为 LoopBack0 10.20.255.21）
+  discovery:
+    extra-ips: ${NMS_DISCOVERY_EXTRA_IPS:10.20.255.21}
   # 阅知类 trapType：确认即办结。实验室高频提示/抖动类一并纳入；不含认证失败/离线/冷启动等需跟进项。
   alarm:
     ack-closes-types:

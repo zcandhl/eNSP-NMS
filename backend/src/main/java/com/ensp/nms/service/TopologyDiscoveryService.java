@@ -1,13 +1,16 @@
 package com.ensp.nms.service;
 
+import com.ensp.nms.device.DeviceType;
 import com.ensp.nms.entity.Device;
 import com.ensp.nms.entity.TopologyLink;
 import com.ensp.nms.repository.DeviceRepository;
 import com.ensp.nms.repository.TopologyLinkRepository;
 import com.ensp.nms.repository.TopologyNodeRepository;
 import com.ensp.nms.snmp.SnmpClient;
+import com.ensp.nms.ssh.SshClient;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,6 +26,22 @@ public class TopologyDiscoveryService {
     private final TopologyNodeRepository topologyNodeRepository;
     private final SnmpClient snmpClient;
     private final DeviceCapabilityService deviceCapabilityService;
+    private final SshClient sshClient;
+
+    /** 设备未登记 SSH 凭据时的默认账号（eNSP 实验环境统一 opsadmin） */
+    @Value("${nms.ssh.default-username:}")
+    private String defaultSshUsername;
+
+    @Value("${nms.ssh.default-password:}")
+    private String defaultSshPassword;
+
+    /**
+     * ARP/MAC 兜底建链总开关。
+     * eNSP 的 ARP 表是「三层可达」而非「直连」，用它建链会把整网拉成网状假链路
+     * （unknown ↔ ? / 1Gbps）。真实链路以 LLDP（SNMP/SSH CLI）为准，默认关闭兜底。
+     */
+    @Value("${nms.topology.arp-fallback-enabled:false}")
+    private boolean arpFallbackEnabled;
 
     @Transactional
     public Map<String, Object> discoverTopology() {
@@ -37,12 +56,23 @@ public class TopologyDiscoveryService {
 
         Map<String, Object> result = new HashMap<>();
 
+        // clearLinks=true：先清空历史链路，避免 ARP 兜底等旧数据残留（如 unknown/1Gbps 假链路）
+        if (options != null && Boolean.parseBoolean(String.valueOf(options.get("clearLinks")))) {
+            long removed = topologyLinkRepository.count();
+            topologyLinkRepository.deleteAll();
+            result.put("clearedLinks", removed);
+            log.info("clearLinks=true：已清空历史链路 {} 条", removed);
+        }
+
         result.put("totalDevices", devices.size());
         result.put("discoveryMethod", method);
 
         int discoveredLinks = 0;
         int skippedOffline = 0;
         int scannedOnline = 0;
+        // 是否真的读到了邻居表（LLDP/CDP/SSH）。只要读到，就说明这些是「设备自己声明的直连」，
+        // 绝不能再拿 ARP 兜底去补，否则每轮都会新增一批假链路。
+        boolean lldpAuthoritative = false;
         String primaryMethod = "LLDP/CDP";
         Set<String> addedLinks = new HashSet<>();
         List<Map<String, Object>> deviceResults = new ArrayList<>();
@@ -118,8 +148,19 @@ public class TopologyDiscoveryService {
                     log.info("  华为私有LLDP发现 {} 个邻居", hwLldpNeighbors.size());
                 }
 
+                // eNSP 不暴露 LLDP MIB（标准/华为私有均无邻居表），退而通过 SSH 采集 CLI 邻居表
+                List<Map<String, String>> sshLldpNeighbors = discoverLldpNeighborsViaSsh(device);
+                if (!sshLldpNeighbors.isEmpty()) {
+                    neighbors.addAll(sshLldpNeighbors);
+                    sources.add("SSH-LLDP");
+                    log.info("  SSH LLDP发现 {} 个邻居", sshLldpNeighbors.size());
+                }
+
                 deviceResult.put("neighborCount", neighbors.size());
                 deviceResult.put("sources", sources);
+                if (!neighbors.isEmpty()) {
+                    lldpAuthoritative = true;
+                }
 
                 for (Map<String, String> neighbor : neighbors) {
                     String neighborIp = extractNeighborIp(neighbor, macToIp);
@@ -166,7 +207,9 @@ public class TopologyDiscoveryService {
 
                     String linkKey = createLinkKey(device.getId(), neighborDevice.getId());
                     if (!addedLinks.contains(linkKey)) {
-                        if (!linkExistsBetween(device.getId(), neighborDevice.getId())) {
+                        Optional<TopologyLink> existing =
+                                topologyLinkRepository.findBetweenDevices(device.getId(), neighborDevice.getId());
+                        if (existing.isEmpty()) {
                             TopologyLink link = new TopologyLink();
                             link.setSourceNodeId(device.getId());
                             link.setTargetNodeId(neighborDevice.getId());
@@ -182,7 +225,16 @@ public class TopologyDiscoveryService {
                                     device.getName(), sourcePort,
                                     neighborDevice.getName(), targetPort);
                         } else {
-                            log.debug("  连接已存在: {} -> {}", device.getName(), neighborDevice.getName());
+                            // 已存在但可能是 ARP 兜底留下的「假链路」（端口 unknown/空）：
+                            // 用 LLDP 的真实端口把它补全，否则前端永远显示 unknown ↔ ?
+                            boolean upgraded = upgradeSyntheticLink(existing.get(), device.getId(), sourcePort, targetPort);
+                            addedLinks.add(linkKey);
+                            if (upgraded) {
+                                log.info("  ↑ 已用 LLDP 端口补全历史链路: {} ({}) -> {} ({})",
+                                        device.getName(), sourcePort, neighborDevice.getName(), targetPort);
+                            } else {
+                                log.debug("  连接已存在: {} -> {}", device.getName(), neighborDevice.getName());
+                            }
                         }
                     }
                 }
@@ -207,9 +259,23 @@ public class TopologyDiscoveryService {
         }
         }
 
-        // eNSP 等环境 LLDP MIB 常为空：只要尚未发现新链路就回退 ARP（含 method=lldp）
-        if ("arp".equals(method) || discoveredLinks == 0) {
-            if ("arp".equals(method)) {
+        // 只要 LLDP/CDP/SSH 读到了邻居表，就以「设备自己声明的直连」为准，
+        // 顺手清掉历史 ARP 兜底留下的假链路（unknown / Port-N / 1Gbps 网状连线）。
+        if (lldpAuthoritative && !"arp".equals(method)) {
+            int purged = purgeSyntheticLinks();
+            if (purged > 0) {
+                result.put("purgedSyntheticLinks", purged);
+                log.info("LLDP 邻居可用，已清理历史 ARP 假链路 {} 条", purged);
+            }
+        }
+
+        // ARP 只在「显式指定」或「完全读不到 LLDP 且开关打开」时兜底；
+        // 不能因为「本轮没有新增链路」就回退 ARP —— 那会让每轮定时任务都新增一批假链路。
+        boolean arpRequested = "arp".equals(method);
+        boolean shouldFallback = arpRequested
+                || (discoveredLinks == 0 && !lldpAuthoritative && arpFallbackEnabled);
+        if (shouldFallback) {
+            if (arpRequested) {
                 primaryMethod = "ARP/MAC";
                 deviceResults.clear();
                 failures.clear();
@@ -223,17 +289,19 @@ public class TopologyDiscoveryService {
                         scannedOnline++;
                     }
                 }
-            } else if (!"arp".equals(method)) {
-                log.info("LLDP/CDP/华为LLDP未发现新连接，回退 ARP/MAC 发现（实验室常用）...");
+            } else {
+                log.info("所有设备均未返回 LLDP/CDP 邻居，回退 ARP/MAC 发现（nms.topology.arp-fallback-enabled=true）...");
                 primaryMethod = "ARP/MAC";
             }
             int arpLinks = discoverTopologyByArpAndMac(devices, addedLinks);
             discoveredLinks += arpLinks;
             if (arpLinks == 0) {
                 primaryMethod = discoveredLinks > 0 ? primaryMethod : "无新链路";
-            } else if (!"arp".equals(method) && !"ARP/MAC".equals(primaryMethod)) {
+            } else if (!arpRequested) {
                 primaryMethod = primaryMethod + "+ARP";
             }
+        } else if (discoveredLinks == 0 && !lldpAuthoritative) {
+            primaryMethod = "未读到 LLDP 邻居（ARP 兜底已关闭）";
         }
 
         result.put("discoveredLinks", discoveredLinks);
@@ -248,6 +316,73 @@ public class TopologyDiscoveryService {
                 devices.size(), scannedOnline, skippedOffline, discoveredLinks, primaryMethod));
 
         return result;
+    }
+
+    /**
+     * 通过 SSH 执行 display lldp neighbor brief 采集邻居。
+     * 返回邻居 Map：sysName / localPort / remotePort（与 SNMP LLDP 邻居的取键保持兼容）。
+     * eNSP 设备未在库登记 SSH 凭据时回退到 nms.ssh.default-* 配置。
+     */
+    private List<Map<String, String>> discoverLldpNeighborsViaSsh(Device device) {
+        // eNSP 的 AC6005 镜像 SSH 服务不可用：TCP 能连上、banner 正常，但收到 KEXINIT 后
+        // 不响应，且会拖垮设备（实测多次触发整机重启）。故 AC 一律不走 SSH 采集，
+        // 邻居关系靠 SNMP 或人工登记补齐。
+        if (DeviceType.fromCode(device.getDeviceType()) == DeviceType.AC) {
+            // AC6005 为 telnet 管理，且 eNSP 镜像不暴露 LLDP 数据，跳过采集
+            log.debug("设备 {} 为 AC，跳过 LLDP 采集（eNSP 镜像无 LLDP 数据）", device.getName());
+            return List.of();
+        }
+        String user = firstNonBlank(device.getSshUsername(), defaultSshUsername);
+        String pass = firstNonBlank(device.getSshPassword(), defaultSshPassword);
+        if (user == null || pass == null) {
+            log.debug("设备 {} 未登记远程管理凭据且无默认凭据，跳过 LLDP 采集", device.getName());
+            return List.of();
+        }
+        // 按设备管理协议分流（当前非 AC 设备均为 SSH，预留 telnet 通道以保持一致）
+        String protocol = device.isTelnetManagement()
+                ? SshClient.PROTOCOL_TELNET : SshClient.PROTOCOL_SSH;
+        int mgmtPort = device.getSshPort() != null && device.getSshPort() > 0
+                ? device.getSshPort() : SshClient.defaultPort(protocol);
+        try {
+            String output = sshClient.executeDisplayCommand(
+                    device.getIpAddress(), mgmtPort, user, pass, "display lldp neighbor brief", protocol);
+            return parseLldpNeighborBrief(output);
+        } catch (Exception e) {
+            log.info("设备 {} SSH LLDP 采集失败: {}", device.getName(), e.getMessage());
+            return List.of();
+        }
+    }
+
+    /**
+     * 解析 display lldp neighbor brief 输出，形如：
+     * Local Intf   Neighbor Dev             Neighbor Intf             Exptime
+     * GE0/0/1      AR-EXPORT                GE0/0/1                   106
+     */
+    private List<Map<String, String>> parseLldpNeighborBrief(String output) {
+        List<Map<String, String>> neighbors = new ArrayList<>();
+        if (output == null || output.isBlank()) {
+            return neighbors;
+        }
+        java.util.regex.Pattern row = java.util.regex.Pattern.compile(
+                "^\\s*(\\S+)\\s+(\\S+)\\s+(\\S+)\\s+(\\d+)\\s*$");
+        for (String line : output.split("\\r?\\n")) {
+            java.util.regex.Matcher m = row.matcher(line);
+            if (!m.matches()) {
+                continue;
+            }
+            String localPort = m.group(1);
+            String sysName = m.group(2);
+            String remotePort = m.group(3);
+            if ("Local".equalsIgnoreCase(localPort)) {
+                continue;
+            }
+            Map<String, String> n = new HashMap<>();
+            n.put("localPort", localPort);
+            n.put("sysName", sysName);
+            n.put("remotePort", remotePort);
+            neighbors.add(n);
+        }
+        return neighbors;
     }
 
     @Transactional
@@ -434,7 +569,21 @@ public class TopologyDiscoveryService {
             neighbors.add(neighborInfo);
         }
 
-        // ARP 补充：邻居 IP 在设备库中的项
+        // eNSP 不暴露 LLDP MIB：改从 CLI（display lldp neighbor brief）采集，与全量发现保持一致
+        for (Map<String, String> neighbor : discoverLldpNeighborsViaSsh(device)) {
+            Map<String, String> normalized = new HashMap<>(neighbor);
+            normalized.putIfAbsent("portId", neighbor.get("localPort"));
+            neighbors.add(parseNeighbor(normalized, "SSH-LLDP"));
+        }
+
+        // ARP 补充：仅在完全没有 LLDP 邻居时兜底（ARP 是三层可达，不等于直连，容易造出假链路）
+        if (!neighbors.isEmpty()) {
+            result.put("device", device.getName());
+            result.put("ip", ip);
+            result.put("neighbors", neighbors);
+            result.put("totalNeighbors", neighbors.size());
+            return result;
+        }
         try {
             Map<String, String> arp = snmpClient.getArpTable(ip, port, community);
             for (Map.Entry<String, String> e : arp.entrySet()) {
@@ -660,6 +809,46 @@ public class TopologyDiscoveryService {
 
     private boolean linkExistsBetween(Long deviceA, Long deviceB) {
         return topologyLinkRepository.findBetweenDevices(deviceA, deviceB).isPresent();
+    }
+
+    /** 端口值是否为 ARP 兜底生成的占位值（空 / unknown / Port-<ifIndex>） */
+    private boolean isSyntheticPort(String port) {
+        if (port == null || port.isBlank()) return true;
+        String p = port.trim();
+        return "unknown".equalsIgnoreCase(p) || p.startsWith("Port-");
+    }
+
+    /**
+     * 历史链路若来自 ARP 兜底（端口是占位值、带宽硬编码 1Gbps），用 LLDP 采到的真实端口补齐。
+     */
+    private boolean upgradeSyntheticLink(TopologyLink link, Long currentDeviceId, String localPort, String remotePort) {
+        boolean fakeSource = isSyntheticPort(link.getSourcePort());
+        boolean fakeTarget = isSyntheticPort(link.getTargetPort());
+        if (!fakeSource && !fakeTarget) {
+            return false;
+        }
+        boolean currentIsSource = Objects.equals(link.getSourceNodeId(), currentDeviceId);
+        if (fakeSource) {
+            link.setSourcePort(currentIsSource ? localPort : remotePort);
+        }
+        if (fakeTarget) {
+            link.setTargetPort(currentIsSource ? remotePort : localPort);
+        }
+        if ("1Gbps".equals(link.getBandwidth())) {
+            link.setBandwidth(null);
+        }
+        topologyLinkRepository.save(link);
+        return true;
+    }
+
+    /** 清理 ARP 兜底留下的合成链路 */
+    private int purgeSyntheticLinks() {
+        try {
+            return topologyLinkRepository.deleteSyntheticLinks();
+        } catch (Exception e) {
+            log.warn("清理合成链路失败: {}", e.getMessage());
+            return 0;
+        }
     }
 
     private List<Device> filterDevicesForDiscovery(List<Device> allDevices, Map<String, Object> options) {

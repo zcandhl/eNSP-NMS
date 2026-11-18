@@ -114,7 +114,9 @@ onUnmounted(() => {
   position: fixed;
   right: 24px;
   bottom: 24px;
-  z-index: 4000;
+  /* 低于 Element Plus 弹层（drawer/dialog 从 2000 起），避免压住抽屉/弹窗底部的操作按钮；
+     高于普通页面内容，正常浏览时仍悬浮在最上层 */
+  z-index: 1500;
 }
 .foa-fab {
   width: 48px;

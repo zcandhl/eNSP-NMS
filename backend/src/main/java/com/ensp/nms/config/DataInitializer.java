@@ -11,6 +11,7 @@ import com.ensp.nms.repository.UserRepository;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
 import java.time.LocalDateTime;
@@ -22,7 +23,17 @@ import java.util.Set;
 @Configuration
 public class DataInitializer {
 
+    /** 是否在空库中写入演示设备（默认关闭，避免删光设备后重启又出现） */
+    @org.springframework.beans.factory.annotation.Value("${nms.seed-demo-devices:false}")
+    private boolean seedDemoDevices;
+
+    /**
+     * 顺序很关键：先建 RBAC（权限/角色）、再建默认账号，最后才是各业务模块的种子。
+     * 不写 @Order 时与 ApplicationRunner 的先后不可控——曾导致队员账号拿到空角色、
+     * 全新库里 admin 也没被创建（userRepository.count() 已被队员账号占满）。
+     */
     @Bean
+    @Order(0)
     CommandLineRunner initDatabase(
             DeviceRepository deviceRepository,
             DevicePortRepository devicePortRepository,
@@ -33,6 +44,27 @@ public class DataInitializer {
     ) {
         return args -> {
             rbacSeedService.ensureRbacSeeded();
+
+            // 数据校准：AC6005 在 eNSP 中 SSH 服务异常（KEXINIT 后无响应），
+            // AC 类设备统一改用 telnet 管理，端口同步为 23，避免历史数据仍按 22 去连。
+            for (Device d : deviceRepository.findAll()) {
+                if (com.ensp.nms.device.DeviceType.fromCode(d.getDeviceType())
+                        != com.ensp.nms.device.DeviceType.AC) {
+                    continue;
+                }
+                boolean changed = false;
+                if (!d.isTelnetManagement()) {
+                    d.setManagementProtocol("telnet");
+                    changed = true;
+                }
+                if (d.getSshPort() == null || d.getSshPort() == 22) {
+                    d.setSshPort(23);
+                    changed = true;
+                }
+                if (changed) {
+                    deviceRepository.save(d);
+                }
+            }
 
             if (userRepository.count() == 0) {
                 Role adminRole = roleRepository.findByName("ADMIN").orElse(null);
@@ -82,7 +114,9 @@ public class DataInitializer {
                 }
             });
 
-            if (deviceRepository.count() == 0) {
+            // 演示种子设备默认关闭：真实库里删光设备后重启，绝不能再「变」出三台演示设备，
+            // 否则会被误认为「删了又回来」。需要空白演示环境时用 NMS_SEED_DEMO=true 开启。
+            if (seedDemoDevices && deviceRepository.count() == 0) {
                 Device d1 = new Device();
                 d1.setName("AR2220-路由器-01");
                 d1.setIpAddress("192.168.56.10");

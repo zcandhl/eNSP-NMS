@@ -1013,6 +1013,45 @@ public class SnmpTrapReceiver implements CommandLineRunner {
             info.title = "Juniper设备告警";
             info.severity = Alarm.Severity.WARNING;
             info.type = "厂商告警-Juniper";
+        } else if (oidIs(trapOid, "1.3.6.1.2.1.17.0.1")) {
+            info.title = "STP生成树新根事件";
+            info.severity = Alarm.Severity.WARNING;
+            info.type = "交换告警-STP新根";
+        } else if (oidIs(trapOid, "1.3.6.1.2.1.68.0.1")) {
+            // vrrpTrapNewMaster：VRRP 备份组主备切换，新 Master IP 见 VB vrrpOperMasterIpAddr
+            info.title = "VRRP主备切换告警";
+            info.severity = Alarm.Severity.WARNING;
+            info.type = "路由告警-VRRP主备切换";
+        } else if (oidIs(trapOid, "1.3.6.1.2.1.68.0.2")) {
+            info.title = "VRRP报文认证冲突";
+            info.severity = Alarm.Severity.WARNING;
+            info.type = "路由告警-VRRP认证失败";
+        } else if (trapOid.contains("1.3.6.1.4.1.2011.5.25.127.2.30.1")) {
+            info.title = "VRRP主设备失效";
+            info.severity = Alarm.Severity.MAJOR;
+            info.type = "路由告警-VRRP主设备失效";
+        } else if (trapOid.contains("1.3.6.1.4.1.2011.5.25.127.2.30.2")) {
+            info.title = "VRRP非Master状态";
+            info.severity = Alarm.Severity.WARNING;
+            info.type = "路由告警-VRRP非Master状态";
+        } else if (oidIs(trapOid, "1.3.6.1.4.1.2011.6.139.13.1.1.1")) {
+            // hwApFaultTrap：AP 下线（与 AC 断连/断电/心跳丢失/license 不足等）
+            info.title = "AP下线告警";
+            info.severity = Alarm.Severity.MAJOR;
+            info.type = "WLAN告警-AP下线";
+        } else if (oidIs(trapOid, "1.3.6.1.4.1.2011.6.139.13.1.1.2")) {
+            // hwApNormalTrap：AP 通讯故障恢复（重新上线）
+            info.title = "AP上线恢复通知";
+            info.severity = Alarm.Severity.INFO;
+            info.type = "WLAN告警-AP上线";
+        } else if (oidIs(trapOid, "1.3.6.1.4.1.2011.6.139.18.1.1.1.9")) {
+            info.title = "无线终端上线";
+            info.severity = Alarm.Severity.INFO;
+            info.type = "WLAN告警-终端上线";
+        } else if (oidIs(trapOid, "1.3.6.1.4.1.2011.6.139.18.1.1.1.10")) {
+            info.title = "无线终端下线";
+            info.severity = Alarm.Severity.INFO;
+            info.type = "WLAN告警-终端下线";
         } else if (trapOid.contains("1.3.6.1.4.1.2011.5.25.1.1")) {
             info.title = "系统启动完成";
             info.severity = Alarm.Severity.INFO;

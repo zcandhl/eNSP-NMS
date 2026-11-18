@@ -14,6 +14,16 @@ const routes = [
     component: () => import('@/views/Dashboard.vue')
   },
   {
+    path: '/projects',
+    name: 'ProjectManage',
+    component: () => import('@/views/project/ProjectManage.vue'),
+    meta: { permissions: ['configs:read', 'devices:read'] }
+  },
+  {
+    path: '/acceptance/projects',
+    redirect: '/projects'
+  },
+  {
     path: '/devices',
     name: 'Devices',
     component: () => import('@/views/device/DeviceList.vue'),
@@ -74,6 +84,30 @@ const routes = [
     name: 'Configs',
     component: () => import('@/views/config/ConfigManage.vue'),
     meta: { permissions: ['configs:read'] }
+  },
+  {
+    path: '/acceptance',
+    name: 'AcceptanceOverview',
+    component: () => import('@/views/acceptance/AcceptanceOverview.vue'),
+    meta: { permissions: ['configs:read', 'devices:read'] }
+  },
+  {
+    path: '/acceptance/workbench',
+    name: 'AcceptanceWorkbench',
+    component: () => import('@/views/acceptance/AcceptanceWorkbench.vue'),
+    meta: { permissions: ['configs:read', 'devices:read'] }
+  },
+  {
+    path: '/acceptance/plan',
+    name: 'AcceptancePlanDesign',
+    component: () => import('@/views/acceptance/AcceptancePlanDesign.vue'),
+    meta: { permissions: ['configs:read', 'devices:read'] }
+  },
+  {
+    path: '/acceptance/report',
+    name: 'AcceptanceReport',
+    component: () => import('@/views/acceptance/AcceptanceReport.vue'),
+    meta: { permissions: ['configs:read', 'devices:read'] }
   },
   {
     path: '/users',

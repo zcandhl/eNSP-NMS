@@ -61,6 +61,7 @@ public class AlarmController {
             @RequestParam(required = false, defaultValue = "false") boolean overdueOnly,
             @RequestParam(required = false, defaultValue = "30") int overdueMinutes,
             @RequestParam(required = false) Long deviceId,
+            @RequestParam(required = false) Long projectId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(defaultValue = "occurredAt,desc") String sort
@@ -73,7 +74,7 @@ public class AlarmController {
         }
         Pageable pageable = buildPageable(page, size, sort);
         return ResponseEntity.ok(alarmService.queryAlarms(
-                statuses, sev, keyword, fromTime, to, overdueOnly, overdueMinutes, deviceId, pageable));
+                statuses, sev, keyword, fromTime, to, overdueOnly, overdueMinutes, deviceId, projectId, pageable));
     }
 
     /** 按当前筛选导出 CSV（最多 2000 条） */
@@ -194,6 +195,22 @@ public class AlarmController {
         return alarm.map(ResponseEntity::ok).orElse(ResponseEntity.notFound().build());
     }
 
+    /** 清理孤儿告警（设备已删除/不在库中）：把统计口径拉回当前网络真实状态 */
+    @PostMapping("/purge-orphans")
+    public ResponseEntity<Map<String, Object>> purgeOrphans(Authentication authentication) {
+        int removed = alarmService.purgeOrphanAlarms();
+        auditLogService.record(AuditLogService.AuditRecord.builder()
+                .module("alarm")
+                .action("purge_orphans")
+                .operator(resolveOperator(authentication))
+                .targetType("alarm")
+                .status("success")
+                .summary("清理孤儿告警 " + removed + " 条")
+                .clientIp(AuditLogService.currentClientIp())
+                .build());
+        return ResponseEntity.ok(Map.of("removed", removed));
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteAlarm(@PathVariable Long id, Authentication authentication) {
         String operator = resolveOperator(authentication);
@@ -205,8 +222,7 @@ public class AlarmController {
         return ResponseEntity.notFound().build();
     }
 
-    @PostMapping("/batch-acknowledge")
-    public ResponseEntity<Map<String, Object>> batchAcknowledge(
+    @PostMapping("/batch-acknowledge")    public ResponseEntity<Map<String, Object>> batchAcknowledge(
             @RequestBody Map<String, Object> body,
             Authentication authentication
     ) {

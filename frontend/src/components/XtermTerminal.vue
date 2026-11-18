@@ -214,7 +214,7 @@ const connect = (opts = {}) => {
       
       if (term) {
         term.clear()
-        term.write('\x1b[1;33m正在建立SSH会话...\x1b[0m\r\n')
+        term.write('\x1b[1;33m正在建立远程会话...\x1b[0m\r\n')
       }
       
       webSocket.value.send(JSON.stringify({
@@ -241,7 +241,7 @@ const connect = (opts = {}) => {
             connecting.value = false
             connected.value = true
             if (term) {
-              term.write('\r\n\x1b[1;32m✓ SSH连接成功！\x1b[0m\r\n\r\n')
+              term.write('\r\n\x1b[1;32m✓ 远程连接成功！\x1b[0m\r\n\r\n')
               term.focus()
             }
             try {

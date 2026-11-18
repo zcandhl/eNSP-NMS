@@ -166,6 +166,78 @@ public class ConfigTaskService {
         return task;
     }
 
+    /** 变量集批量下发：每组变量渲染一段配置，段 × 设备 逐对下发（同一设备可收多段不同配置） */
+    public ConfigTaskState submitBatchVariableSets(List<Long> deviceIds, String content,
+                                                   List<Map<String, String>> variableSets,
+                                                   boolean parallel, String reason) {
+        List<Long> ids = deviceIds != null ? new ArrayList<>(deviceIds) : new ArrayList<>();
+        List<Map<String, String>> sets = variableSets != null ? variableSets : List.of();
+        Map<String, Object> req = new LinkedHashMap<>();
+        req.put("deviceIds", ids);
+        req.put("content", content);
+        req.put("variableSets", sets);
+        req.put("parallel", parallel);
+        req.put("reason", reason);
+
+        ConfigTaskState task = newTask("batch_varsets", req);
+        task.setLabel("变量集批量下发 " + sets.size() + " 段 × " + ids.size() + " 台");
+        task.setTargetCount(sets.size() * ids.size());
+        task.setOperator(SecurityUtils.currentOperator());
+        persist(task);
+
+        runAsync(task, () -> {
+            task.setStatus("RUNNING");
+            task.setMessage("开始变量集批量下发...");
+            task.setProgress(2);
+            persist(task);
+            try {
+                Map<String, Object> result = deviceConfigService.batchApplyVariableSets(
+                        ids, content, sets, parallel,
+                        (done, tot) -> {
+                            if (isCancelRequested(task)) return;
+                            int pct = tot <= 0 ? 95 : Math.min(95, 5 + (done * 90 / tot));
+                            task.setProgress(pct);
+                            task.setMessage("已完成 " + done + "/" + tot + "（段×设备）");
+                            persist(task);
+                        },
+                        reason
+                );
+                if (isCancelRequested(task)) {
+                    markCancelled(task);
+                    return;
+                }
+                task.setResult(result);
+                task.setProgress(100);
+                long ok = result.get("successCount") instanceof Number n ? n.longValue() : 0;
+                long all = result.get("totalCount") instanceof Number n ? n.longValue() : 0;
+                if (ok >= all && all > 0) {
+                    task.setStatus("SUCCESS");
+                    task.setMessage("变量集批量下发完成");
+                } else if (ok > 0) {
+                    task.setStatus("PARTIAL");
+                    task.setMessage("变量集批量下发完成（部分失败）");
+                } else {
+                    task.setStatus("FAILED");
+                    task.setMessage("变量集批量下发失败");
+                }
+            } catch (Exception e) {
+                log.error("异步变量集批量下发失败", e);
+                task.setStatus("FAILED");
+                task.setError(e.getMessage());
+                task.setMessage("变量集批量下发失败: " + e.getMessage());
+                task.setProgress(100);
+            } finally {
+                if (!"CANCELLED".equals(task.getStatus())) {
+                    task.setFinishedAt(LocalDateTime.now());
+                    persist(task);
+                    recordTaskAudit(task, "batch_apply_varsets");
+                }
+                purgeMemoryOld();
+            }
+        });
+        return task;
+    }
+
     private void runBatchApply(ConfigTaskState task, List<Long> allIds, String content,
                                boolean enableVariables, boolean parallel, String reason,
                                int waveSize, List<Map<String, Object>> priorResults) {

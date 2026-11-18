@@ -87,10 +87,7 @@
               </div>
               <div class="metric-side">
                 <div class="metric-big" :style="{ color: getCpuColor() }">{{ fmtPct(cpuUsage) }}</div>
-                <div class="metric-hint">
-                  {{ metricSourceLabel(performanceData?.cpuSource) }}
-                  <el-tag v-if="performanceData?.dataSource === 'simulated'" size="small" type="info" effect="plain" class="src-tag">仿真</el-tag>
-                </div>
+                <div class="metric-hint">{{ cpuSourceLabel || '采样周期 10s' }}</div>
                 <svg v-if="sparkCpu.length > 1" class="spark" viewBox="0 0 120 28" preserveAspectRatio="none">
                   <polyline
                     fill="none"
@@ -125,8 +122,7 @@
               <div class="metric-side">
                 <div class="metric-big" :style="{ color: getMemoryColor() }">{{ fmtPct(memoryUsage) }}</div>
                 <div class="metric-hint">
-                  {{ formatBytes(memoryUsed) }} / {{ formatBytes(memoryTotal) }}
-                  · {{ metricSourceLabel(performanceData?.memorySource) }}
+                  {{ formatBytes(memoryUsed) }} / {{ formatBytes(memoryTotal) }}<template v-if="memSourceLabel"> · {{ memSourceLabel }}</template>
                 </div>
                 <svg v-if="sparkMem.length > 1" class="spark" viewBox="0 0 120 28" preserveAspectRatio="none">
                   <polyline
@@ -357,7 +353,9 @@
 import { ref, onMounted, onUnmounted, computed, nextTick, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { createVisibilityPoller } from '@/composables/useVisibilityPoller'
+const projectStore = useProjectStore()
 import { deviceApi, performanceApi } from '@/api/device'
+import { useProjectStore } from '@/stores/project'
 import { canCollectPerformance } from '@/utils/deviceCapabilities'
 import { askOpsAssistant, syncOpsAssistantFocus } from '@/composables/askOpsAssistant'
 import { clearPageContext, setPageContext, usePageOpsBus } from '@/composables/pageOpsBus'
@@ -402,10 +400,11 @@ const memoryUsage = computed(() => performanceData.value?.memoryUsage)
 
 function metricSourceLabel(src) {
   if (src === 'snmp') return 'SNMP 真采'
-  if (src === 'simulated') return '仿真回退'
   if (src === 'mixed') return '混合'
-  return '来源未知'
+  return ''
 }
+const cpuSourceLabel = computed(() => metricSourceLabel(performanceData.value?.cpuSource))
+const memSourceLabel = computed(() => metricSourceLabel(performanceData.value?.memorySource))
 const memoryUsed = computed(() => performanceData.value?.memoryUsed)
 const memoryTotal = computed(() => performanceData.value?.memoryTotal)
 const temperature = computed(() => performanceData.value?.temperature)
@@ -522,9 +521,22 @@ const hwClass = (status, kind) => {
   return 'is-ok'
 }
 
+// 顶栏切换工程 → 重新加载工程下设备
+watch(
+  () => projectStore.projectId,
+  () => {
+    selectedDeviceId.value = null
+    loadDevices()
+  }
+)
+
 const loadDevices = async () => {
   try {
-    devices.value = await deviceApi.getDevices()
+    // 全局工程上下文：只展示当前工程下可采集设备（未选工程时显示全部）
+    const all = await deviceApi.getDevices()
+    devices.value = projectStore.projectId
+      ? all.filter(d => d.projectId === projectStore.projectId)
+      : all
     const qid = route.query.deviceId != null ? Number(route.query.deviceId) : null
     const perfList = devices.value.filter(d => canCollectPerformance(d))
     if (qid && perfList.some(d => Number(d.id) === qid)) {

@@ -64,6 +64,17 @@ public class Device {
     @Column(name = "ssh_port")
     private Integer sshPort = 22;
 
+    /**
+     * 远程管理协议：ssh | telnet
+     * <p>AC6005 在 eNSP 中 SSH 服务异常（KEXINIT 后无响应），AC 类设备统一走 telnet。</p>
+     */
+    @Column(name = "management_protocol", length = 10)
+    private String managementProtocol = "ssh";
+
+    public boolean isTelnetManagement() {
+        return managementProtocol != null && "telnet".equalsIgnoreCase(managementProtocol.trim());
+    }
+
     @Column(length = 20)
     private String status = "offline";
 
@@ -72,6 +83,10 @@ public class Device {
 
     @Column(name = "group_id")
     private Long groupId;
+
+    /** 所属工程（网络工程档案），全软件共享的工程上下文 */
+    @Column(name = "project_id")
+    private Long projectId;
 
     /** 机房/机柜/位置等资产信息 */
     @Column(length = 200)

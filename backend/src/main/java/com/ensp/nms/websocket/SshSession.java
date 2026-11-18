@@ -1,6 +1,7 @@
 package com.ensp.nms.websocket;
 
 import com.ensp.nms.entity.Device;
+import com.ensp.nms.ssh.SshClient;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jcraft.jsch.ChannelShell;
 import com.jcraft.jsch.JSch;
@@ -26,8 +27,11 @@ public class SshSession {
     private final WebSocketSession webSocketSession;
     private final Device device;
     private final String sshPassword;
+    private final SshClient sshClient;
     private Session sshSession;
     private ChannelShell channel;
+    /** telnet 会话载体（AC6005 等 SSH 不可用的设备）；ssh 设备为 null */
+    private SshClient.ShellTransport telnetTransport;
     private OutputStream sshOut;
     private InputStream sshIn;
     private Thread outputThread;
@@ -35,17 +39,34 @@ public class SshSession {
     private volatile boolean running = true;
     private final BlockingQueue<String> messageQueue = new LinkedBlockingQueue<>(200);
 
-    public SshSession(WebSocketSession webSocketSession, Device device, String sshPassword) {
+    public SshSession(WebSocketSession webSocketSession, Device device, String sshPassword, SshClient sshClient) {
         this.webSocketSession = webSocketSession;
         this.device = device;
         this.sshPassword = sshPassword;
+        this.sshClient = sshClient;
     }
 
     public void connect() throws Exception {
-        log.info("开始连接SSH: {}:{}", device.getIpAddress(),
-                device.getSshPort() != null ? device.getSshPort() : 22);
+        boolean telnet = device.isTelnetManagement();
+        int port = device.getSshPort() != null && device.getSshPort() > 0
+                ? device.getSshPort() : SshClient.defaultPort(telnet ? SshClient.PROTOCOL_TELNET : SshClient.PROTOCOL_SSH);
+        log.info("开始连接{}: {}:{}", telnet ? "Telnet" : "SSH", device.getIpAddress(), port);
 
         try {
+            if (telnet) {
+                // AC6005 的 SSH 服务在 eNSP 中不可用（连接即无响应），走 telnet 交互通道。
+                // sshClient 由 Handler 注入（携带超时等配置），不可直接 new。
+                telnetTransport = sshClient.openInteractive(
+                        device.getIpAddress(), port, device.getSshUsername(), sshPassword,
+                        SshClient.PROTOCOL_TELNET);
+                sshIn = telnetTransport.in();
+                sshOut = telnetTransport.out();
+                log.info("Telnet 交互会话已建立，启动输出读取线程...");
+                startOutputThread();
+                log.info("Telnet 连接完成");
+                return;
+            }
+
             JSch jsch = new JSch();
             sshSession = jsch.getSession(
                     device.getSshUsername(),
@@ -173,8 +194,11 @@ public class SshSession {
         }
     }
 
-    /** 同步远端 PTY 行列，随 Web 终端窗口缩放 */
+    /** 同步远端 PTY 行列，随 Web 终端窗口缩放（telnet 无 PTY 概念，忽略） */
     public void resizePty(int cols, int rows) {
+        if (telnetTransport != null) {
+            return;
+        }
         if (channel == null || !channel.isConnected()) {
             return;
         }
@@ -222,6 +246,12 @@ public class SshSession {
         try {
             if (sshOut != null) sshOut.close();
         } catch (IOException e) { /* ignore */ }
+        if (telnetTransport != null) {
+            telnetTransport.close();
+            telnetTransport = null;
+            log.info("Telnet session disconnected for device: {}", device.getName());
+            return;
+        }
         if (channel != null) channel.disconnect();
         if (sshSession != null) sshSession.disconnect();
         log.info("SSH session disconnected for device: {}", device.getName());

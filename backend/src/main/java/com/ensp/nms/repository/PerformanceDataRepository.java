@@ -71,4 +71,13 @@ public interface PerformanceDataRepository extends JpaRepository<PerformanceData
            ") t ON p.port_index = t.port_index AND p.timestamp = t.max_ts " +
            "WHERE p.device_id = :deviceId", nativeQuery = true)
     List<PerformanceData> findLatestPortMetricsByDeviceId(@Param("deviceId") Long deviceId);
+
+    /** 全网每台设备最新一条系统级指标（CPU/内存），供大屏 TopN 使用 */
+    @Query(value = "SELECT p.* FROM performance_data p " +
+           "INNER JOIN (" +
+           "  SELECT device_id, MAX(timestamp) AS max_ts FROM performance_data " +
+           "  WHERE port_index IS NULL GROUP BY device_id" +
+           ") t ON p.device_id = t.device_id AND p.timestamp = t.max_ts " +
+           "WHERE p.port_index IS NULL", nativeQuery = true)
+    List<PerformanceData> findLatestSystemMetricsAllDevices();
 }

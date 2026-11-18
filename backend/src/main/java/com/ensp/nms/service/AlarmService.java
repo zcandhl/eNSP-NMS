@@ -55,14 +55,20 @@ public class AlarmService {
         return alarmProperties != null && alarmProperties.isAckClosesType(trapType);
     }
 
-    /** 是否阅知关闭：trapType 白名单、INFO 级别，或标题命中常见阅知事件 */
+    /** 是否阅知关闭：性能阈值告警、trapType 白名单、INFO 级别，或标题命中常见阅知事件 */
     public boolean isAckClosesAlarm(Alarm alarm) {
         if (alarm == null) {
             return false;
         }
-        // 明确排除需跟进类（即使误标 INFO 也不阅知关闭）
         String type = alarm.getTrapType() != null ? alarm.getTrapType().trim() : "";
         String title = alarm.getTitle() != null ? alarm.getTitle().trim() : "";
+        // 性能阈值告警（性能模块模拟采集，越限未恢复时会自动重报/复活）按阅知类处理：
+        // 阅知关闭后若指标仍在阈值外，性能模块会再次同步生成，不会漏报。
+        // 需放在排除规则之前：如「性能告警-CPU阈值」按字面会被下方 CPU 排除规则拦截。
+        if ("PERFORMANCE".equals(type) || type.startsWith("性能告警-")) {
+            return true;
+        }
+        // 明确排除需跟进类（即使误标 INFO 也不阅知关闭）
         if (type.contains("认证失败") || title.contains("认证失败")
                 || "DEVICE_OFFLINE".equals(type) || title.contains("设备离线")
                 || type.contains("冷启动") || title.contains("冷启动")
@@ -399,6 +405,21 @@ public class AlarmService {
                                    int overdueMinutes,
                                    Long deviceId,
                                    Pageable pageable) {
+        return queryAlarms(statuses, severity, keyword, from, to, overdueOnly, overdueMinutes, deviceId, null, pageable);
+    }
+
+    /** projectId 非空时按工程过滤（借 device join 的 project_id）；-1 约定为"未分配工程" */
+    @Transactional
+    public Page<Alarm> queryAlarms(List<Alarm.Status> statuses,
+                                   Alarm.Severity severity,
+                                   String keyword,
+                                   LocalDateTime from,
+                                   LocalDateTime to,
+                                   boolean overdueOnly,
+                                   int overdueMinutes,
+                                   Long deviceId,
+                                   Long projectId,
+                                   Pageable pageable) {
         final LocalDateTime overdueBefore = overdueOnly
                 ? LocalDateTime.now().minusMinutes(Math.max(overdueMinutes, 1))
                 : null;
@@ -452,6 +473,13 @@ public class AlarmService {
                     ));
                 } else {
                     preds.add(cb.equal(deviceJoin.get("id"), deviceId));
+                }
+            }
+            if (projectId != null) {
+                if (projectId < 0) {
+                    preds.add(cb.isNull(deviceJoin.get("projectId")));
+                } else {
+                    preds.add(cb.equal(deviceJoin.get("projectId"), projectId));
                 }
             }
             if (keyword != null && !keyword.isBlank()) {
@@ -1375,6 +1403,19 @@ public class AlarmService {
             if (deleteAlarm(id)) {
                 n++;
             }
+        }
+        return n;
+    }
+
+    /**
+     * 清理孤儿告警：设备已不在库中、但告警仍带其 IP 的历史记录。
+     * 这些记录会让「今日告警 / 近 7 天 / 按级别」等统计长期虚高。
+     */
+    @Transactional
+    public int purgeOrphanAlarms() {
+        int n = alarmRepository.deleteOrphanAlarms();
+        if (n > 0) {
+            log.info("清理孤儿告警 {} 条（设备已不存在）", n);
         }
         return n;
     }

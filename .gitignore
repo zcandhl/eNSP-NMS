@@ -21,6 +21,8 @@ Thumbs.db
 
 # Local / secrets / clutter
 环境/
+output/
+_shot/
 *.exe
 *.msi
 .env

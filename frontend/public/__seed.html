@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <title>预览引导</title>
+</head>
+<body>
+  <script>
+    // 仅供本地预览使用：写入演示会话后跳转到验收工作台
+    // ?who=playerN 可指定以哪个队员身份预览（演示"我"标效果）
+    const q = new URLSearchParams(location.search)
+    const who = q.get('who') || 'player4'
+    const names = {
+      player1: '1号·网络设计与实施', player2: '2号·软件开发',
+      player3: '3号·测试与交付', player4: '4号·验收质检'
+    }
+    q.delete('who')
+    localStorage.setItem('ensp_nms_token', 'preview-token')
+    localStorage.setItem('ensp_nms_user', JSON.stringify({
+      username: who,
+      realName: names[who] || '预览账号',
+      roles: ['OPERATOR'],
+      permissions: [
+        'devices:read', 'devices:write', 'configs:read', 'configs:write',
+        'performance:read', 'alarms:read', 'aiops:read', 'topology:read', 'audit:read'
+      ]
+    }))
+    location.replace('/acceptance' + (q.toString() ? '?' + q.toString() : ''))
+  </script>
+</body>
+</html>

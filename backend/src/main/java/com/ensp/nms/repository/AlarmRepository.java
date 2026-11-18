@@ -92,6 +92,15 @@ public interface AlarmRepository extends JpaRepository<Alarm, Long>, JpaSpecific
     @Query("SELECT a.severity, COUNT(a) FROM Alarm a WHERE a.status = :status GROUP BY a.severity")
     List<Object[]> countByStatusGroupBySeverity(@Param("status") Alarm.Status status);
 
+    /** 多状态按级别分组计数（大屏：活动告警级别分布） */
+    @Query("SELECT a.severity, COUNT(a) FROM Alarm a WHERE a.status IN :statuses GROUP BY a.severity")
+    List<Object[]> countGroupBySeverityInStatus(@Param("statuses") List<Alarm.Status> statuses);
+
+    /** 近 N 天按告警类型分组计数（大屏：告警类型 TopN） */
+    @Query("SELECT a.trapType, COUNT(a) FROM Alarm a WHERE a.occurredAt >= :since AND a.trapType IS NOT NULL " +
+            "GROUP BY a.trapType ORDER BY COUNT(a) DESC")
+    List<Object[]> countTrapTypeSince(@Param("since") LocalDateTime since, Pageable pageable);
+
     /**
      * 近 N 小时按小时聚合。返回 [year, month, day, hour, count]
      */
@@ -107,6 +116,26 @@ public interface AlarmRepository extends JpaRepository<Alarm, Long>, JpaSpecific
     @Modifying(clearAutomatically = true)
     @Query("UPDATE Alarm a SET a.device = null WHERE a.device.id = :deviceId")
     int clearDeviceReference(@Param("deviceId") Long deviceId);
+
+    /** 删除设备时一并删除该设备的全部告警（设备已不存在，告警不再具备处置对象） */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("DELETE FROM Alarm a WHERE a.device.id = :deviceId")
+    int deleteByDeviceIdHard(@Param("deviceId") Long deviceId);
+
+    /** 兜底：已解除外键但仍带该设备 IP 的孤儿告警（如 Trap 先到、设备尚未登记） */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("DELETE FROM Alarm a WHERE a.device IS NULL AND a.deviceIp = :deviceIp")
+    int deleteOrphanByDeviceIp(@Param("deviceIp") String deviceIp);
+
+    /**
+     * 清理「设备已不在库中」的孤儿告警：device_id 为空且 device_ip 不等于任何现存设备地址。
+     * 这些记录来自已删除设备或历史实验网络，会持续污染告警统计（今日/近7天/按级别）。
+     * 真正的全局系统告警（device_ip 也为空）不会被删除。
+     */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query(value = "DELETE FROM alarm WHERE device_id IS NULL AND device_ip IS NOT NULL " +
+            "AND device_ip NOT IN (SELECT ip_address FROM device)", nativeQuery = true)
+    int deleteOrphanAlarms();
 
     @Query("SELECT a FROM Alarm a WHERE a.device.id = :deviceId AND a.trapType = 'PERFORMANCE' " +
            "AND a.rawData = :metric AND a.status IN :statuses ORDER BY a.occurredAt DESC")

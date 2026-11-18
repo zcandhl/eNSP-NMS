@@ -807,6 +807,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import * as echarts from 'echarts'
 import { createVisibilityPoller } from '@/composables/useVisibilityPoller'
 import { useAuthStore } from '@/stores/auth'
+import { useProjectStore } from '@/stores/project'
 import { storeToRefs } from 'pinia'
 import { useThemeStore } from '@/stores/theme'
 import { readThemePrimary, primaryAlpha, useThemeSync } from '@/composables/useThemeColors'
@@ -820,6 +821,7 @@ import OpsInlineShell from '@/components/ops-assistant/OpsInlineShell.vue'
 const router = useRouter()
 const route = useRoute()
 const auth = useAuthStore()
+const projectStore = useProjectStore()
 const { sink: pageSink } = usePageOpsBus()
 const themeStore = useThemeStore()
 const { accent, revision } = storeToRefs(themeStore)
@@ -1036,8 +1038,21 @@ const buildQueryParams = () => {
   if (deviceIdFilter.value != null) {
     params.deviceId = deviceIdFilter.value
   }
+  // 全局工程上下文：只看当前工程下设备的告警
+  if (projectStore.projectId != null) {
+    params.projectId = projectStore.projectId
+  }
   return params
 }
+
+// 顶栏切换工程 → 重新加载告警
+watch(
+  () => projectStore.projectId,
+  () => {
+    page.value = 1
+    loadAlarms()
+  }
+)
 
 const loadAlarms = async (silent = false) => {
   if (!silent) loading.value = true
@@ -1186,6 +1201,10 @@ const onMetricClick = (key) => {
   })
 }
 
+// 级别块下钻期间记住原时间范围与状态筛选，取消下钻时还原
+let severityDrillPrevRange = null
+let severityDrillPrevStatus = null
+
 const onSeverityCardClick = (filter) => {
   if (dutyView.value === 'critical' || dutyView.value === 'overdue') {
     dutyView.value = 'duty'
@@ -1199,11 +1218,32 @@ const onSeverityCardClick = (filter) => {
   }
   if (filter === '') {
     selectedSeverity.value = ''
+    restoreSeverityDrillRange()
     page.value = 1
     loadAlarms(false)
     return
   }
   filterBySeverity(filter)
+}
+
+/** 级别块显示的是全历史、全状态计数，下钻时需切「全部」时间并放开状态勾选，否则看不到历史告警 */
+const enterSeverityDrillRange = () => {
+  if (!severityDrillPrevRange) severityDrillPrevRange = timeRange.value
+  if (!severityDrillPrevStatus) severityDrillPrevStatus = [...statusFilter.value]
+  if (timeRange.value !== 'all') timeRange.value = 'all'
+  const full = ['ACTIVE', 'ACKNOWLEDGED', 'CLEARED']
+  if (statusFilter.value.length !== 3) statusFilter.value = full
+}
+
+const restoreSeverityDrillRange = () => {
+  if (severityDrillPrevRange) {
+    timeRange.value = severityDrillPrevRange
+    severityDrillPrevRange = null
+  }
+  if (severityDrillPrevStatus) {
+    statusFilter.value = severityDrillPrevStatus
+    severityDrillPrevStatus = null
+  }
 }
 
 const onFilterChange = () => {
@@ -1344,7 +1384,14 @@ useThemeSync(() => {
 })
 
 const filterBySeverity = (severity) => {
-  selectedSeverity.value = selectedSeverity.value === severity ? '' : severity
+  if (selectedSeverity.value === severity) {
+    // 再次点击取消下钻：还原时间范围
+    selectedSeverity.value = ''
+    restoreSeverityDrillRange()
+  } else {
+    selectedSeverity.value = severity
+    enterSeverityDrillRange()
+  }
   page.value = 1
   loadAlarms(false)
 }

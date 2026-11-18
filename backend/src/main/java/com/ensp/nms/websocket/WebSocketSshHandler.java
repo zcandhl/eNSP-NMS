@@ -21,6 +21,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class WebSocketSshHandler extends TextWebSocketHandler {
 
     private final DeviceRepository deviceRepository;
+    private final com.ensp.nms.ssh.SshClient sshClient;
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final Map<String, SshSession> sessions = new ConcurrentHashMap<>();
 
@@ -69,8 +70,8 @@ public class WebSocketSshHandler extends TextWebSocketHandler {
         }
 
         try {
-            log.info("开始创建SSH会话到设备: {}", device.getName());
-            SshSession sshSession = new SshSession(session, device, device.getSshPassword());
+            log.info("开始创建{}会话到设备: {}", device.isTelnetManagement() ? "Telnet" : "SSH", device.getName());
+            SshSession sshSession = new SshSession(session, device, device.getSshPassword(), sshClient);
             sshSession.connect();
             sessions.put(session.getId(), sshSession);
             log.info("SSH连接成功: {}", device.getName());

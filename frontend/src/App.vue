@@ -22,9 +22,17 @@
           <el-icon><Monitor /></el-icon>
           <template #title>概览</template>
         </el-menu-item>
+        <el-menu-item v-if="auth.hasAnyPermission('configs:read', 'devices:read')" index="/projects">
+          <el-icon><OfficeBuilding /></el-icon>
+          <template #title>工程管理</template>
+        </el-menu-item>
         <el-menu-item v-if="auth.hasPermission('devices:read')" index="/devices">
           <el-icon><Box /></el-icon>
           <template #title>设备管理</template>
+        </el-menu-item>
+        <el-menu-item v-if="auth.hasPermission('topology:read')" index="/topology">
+          <el-icon><Connection /></el-icon>
+          <template #title>拓扑视图</template>
         </el-menu-item>
         <el-menu-item v-if="auth.hasPermission('performance:read')" index="/performance">
           <el-icon><DataAnalysis /></el-icon>
@@ -45,10 +53,17 @@
           <el-icon><DocumentCopy /></el-icon>
           <template #title>配置管理</template>
         </el-menu-item>
-        <el-menu-item v-if="auth.hasPermission('topology:read')" index="/topology">
-          <el-icon><Connection /></el-icon>
-          <template #title>拓扑视图</template>
-        </el-menu-item>
+        <el-sub-menu v-if="auth.hasAnyPermission('configs:read', 'devices:read')" index="acceptance">
+          <template #title>
+            <el-icon><CircleCheck /></el-icon>
+            <span>验收管理</span>
+            <span v-if="!asideCollapsed" class="nav-badge">ACS</span>
+          </template>
+          <el-menu-item index="/acceptance">验收总览</el-menu-item>
+          <el-menu-item index="/acceptance/plan">方案设计</el-menu-item>
+          <el-menu-item index="/acceptance/workbench">验收工作台</el-menu-item>
+          <el-menu-item index="/acceptance/report">验收报告</el-menu-item>
+        </el-sub-menu>
         <el-menu-item v-if="auth.hasAnyPermission('users:manage', 'roles:manage')" index="/users">
           <el-icon><UserFilled /></el-icon>
           <template #title>用户权限</template>
@@ -58,21 +73,13 @@
           <template #title>日志中心</template>
         </el-menu-item>
       </el-menu>
-      <div v-show="!asideCollapsed" class="aside-foot">
-        <div class="aside-edition">{{ license?.sku || '教学标准版' }}</div>
-        <div class="aside-customer" :title="license?.customer || ''">{{ licenseCustomerShort }}</div>
-        <div class="aside-ver">v{{ license?.version || '1.0.0' }}</div>
-      </div>
     </el-aside>
 
     <el-container class="app-main-wrap">
       <el-header class="app-header" height="56px">
         <div class="header-left">
-          <div class="crumb">
-            <span class="crumb-root">网络管理系统</span>
-            <span class="crumb-sep">/</span>
-            <span class="crumb-cur">{{ currentTitle }}</span>
-          </div>
+          <!-- 页面名已由各页标题承担，顶栏左侧改为放全局工程上下文，不再重复 -->
+          <HeaderProjectSwitcher />
         </div>
         <div class="header-right">
           <HeaderDeviceSearch />
@@ -122,13 +129,14 @@ import { useRoute, useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import {
   Monitor, Box, DataAnalysis, Warning, DocumentCopy, UserFilled,
-  Connection, Document, Opportunity
+  Connection, Document, Opportunity, CircleCheck, OfficeBuilding
 } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
 import { useThemeStore } from '@/stores/theme'
 import FloatingOpsAssistant from '@/components/ops-assistant/FloatingOpsAssistant.vue'
 import FloatingWebTerminal from '@/components/FloatingWebTerminal.vue'
 import ThemePicker from '@/components/ThemePicker.vue'
+import HeaderProjectSwitcher from '@/components/HeaderProjectSwitcher.vue'
 import HeaderAlarmBell from '@/components/HeaderAlarmBell.vue'
 import HeaderDeviceSearch from '@/components/HeaderDeviceSearch.vue'
 import { openWebTerminal } from '@/composables/webTerminalBus'
@@ -140,32 +148,13 @@ const router = useRouter()
 const auth = useAuthStore()
 const theme = useThemeStore()
 const { shell, accent } = storeToRefs(theme)
-const { info: license, load: loadLicense } = useLicenseInfo()
+const { load: loadLicense } = useLicenseInfo()
 const asideCollapsed = ref(false)
-
-const licenseCustomerShort = computed(() => {
-  const c = String(license.value?.customer || '').trim()
-  if (!c) return '授权未配置'
-  return c.length > 14 ? `${c.slice(0, 14)}…` : c
-})
 
 const menuTextColor = computed(() => shell.value.sidebarText)
 const menuActiveColor = computed(() =>
   shell.value.darkMenu ? '#ffffff' : accent.value.primary
 )
-
-const TITLE_MAP = {
-  '/': '运维概览',
-  '/devices': '设备管理',
-  '/performance': '性能监控',
-  '/alarms': '告警管理',
-  '/aiops': '智能运维',
-  '/configs': '配置管理',
-  '/topology': '拓扑视图',
-  '/users': '用户权限',
-  '/audit': '日志中心',
-  '/login': '登录'
-}
 
 const activeMenu = computed(() => {
   const p = route.path
@@ -174,15 +163,6 @@ const activeMenu = computed(() => {
 })
 
 const isLoginPage = computed(() => route.path === '/login')
-
-const currentTitle = computed(() => {
-  const p = route.path
-  if (TITLE_MAP[p]) return TITLE_MAP[p]
-  for (const [key, title] of Object.entries(TITLE_MAP)) {
-    if (key !== '/' && p.startsWith(key)) return title
-  }
-  return route.meta?.title || '工作台'
-})
 
 const ROLE_LABELS = {
   ADMIN: '系统管理员',
@@ -325,35 +305,6 @@ onMounted(() => {
   vertical-align: middle;
 }
 
-.aside-foot {
-  padding: 12px 16px 16px;
-  font-size: 11px;
-  color: var(--nms-aside-foot);
-  letter-spacing: 0.06em;
-  border-top: 1px solid var(--nms-brand-border);
-}
-.aside-edition {
-  font-weight: 600;
-  text-transform: none;
-  letter-spacing: 0.02em;
-}
-.aside-customer {
-  margin-top: 4px;
-  opacity: 0.85;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  text-transform: none;
-  letter-spacing: 0;
-}
-.aside-ver {
-  margin-top: 4px;
-  opacity: 0.75;
-  letter-spacing: 0.02em;
-  text-transform: none;
-  font-size: 10px;
-}
-
 .app-main-wrap {
   min-width: 0;
 }
@@ -380,20 +331,7 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
-}
-
-.crumb-root {
-  color: var(--nms-text-muted);
-}
-
-.crumb-sep {
-  color: #c0c8d4;
-}
-
-.crumb-cur {
-  color: var(--nms-text);
-  font-weight: 600;
+  font-size: 14px;
 }
 
 .header-btn {

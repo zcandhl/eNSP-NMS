@@ -74,6 +74,13 @@ public class AiopsController {
         return aiopsService.screenBrief();
     }
 
+    /** 智能大屏数据看板：设备/告警/性能/处置全量真实指标 */
+    @GetMapping("/dashboard")
+    @PreAuthorize("hasAuthority('aiops:read') or hasAuthority('alarms:read')")
+    public Map<String, Object> dashboard(@RequestParam(value = "force", required = false) Boolean force) {
+        return aiopsService.dashboard(Boolean.TRUE.equals(force));
+    }
+
     @PostMapping("/unattended/run")
     @PreAuthorize("hasAuthority('aiops:write') or hasAuthority('alarms:handle') or hasAuthority('aiops:read')")
     public Map<String, Object> runUnattended(@RequestBody(required = false) Map<String, Object> body) {

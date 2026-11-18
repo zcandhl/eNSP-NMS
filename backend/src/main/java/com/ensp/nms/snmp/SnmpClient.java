@@ -24,6 +24,15 @@ public class SnmpClient {
     private static final int DEFAULT_RETRIES = 1;
 
     public Map<String, String> get(String ip, int port, String community, String oid) {
+        return get(ip, port, community, oid, DEFAULT_TIMEOUT, DEFAULT_RETRIES);
+    }
+
+    /**
+     * 可指定超时/重试次数的 GET。用于「快速二次探测」场景：主探测已超时的地址，
+     * 再用更短超时验证一次，避免整轮扫描时间成倍增长。
+     */
+    public Map<String, String> get(String ip, int port, String community, String oid,
+                                   int timeoutMs, int retries) {
         Map<String, String> result = new HashMap<>();
         Snmp snmp = null;
         try {
@@ -34,7 +43,7 @@ public class SnmpClient {
             transport.listen();
             
             log.debug("创建 SNMP Target: {}:{}/{}", ip, port, community);
-            CommunityTarget<UdpAddress> target = createTarget(ip, port, community);
+            CommunityTarget<UdpAddress> target = createTarget(ip, port, community, timeoutMs, retries);
             
             log.debug("创建 PDU，请求 OID: {}", oid);
             PDU pdu = new PDU();
@@ -116,9 +125,13 @@ public class SnmpClient {
     }
 
     public boolean isReachable(String ip, int port, String community) {
-        log.debug("SNMP 探测: {}:{}/{}", ip, port, community);
+        return isReachable(ip, port, community, DEFAULT_TIMEOUT, DEFAULT_RETRIES);
+    }
+
+    public boolean isReachable(String ip, int port, String community, int timeoutMs, int retries) {
+        log.debug("SNMP 探测: {}:{}/{} (timeout={}ms, retries={})", ip, port, community, timeoutMs, retries);
         try {
-            Map<String, String> result = get(ip, port, community, "1.3.6.1.2.1.1.3.0");
+            Map<String, String> result = get(ip, port, community, "1.3.6.1.2.1.1.3.0", timeoutMs, retries);
             return !result.isEmpty();
         } catch (Exception e) {
             log.debug("SNMP 连接失败: {} - {}", e.getClass().getSimpleName(), e.getMessage());
@@ -127,11 +140,16 @@ public class SnmpClient {
     }
 
     private CommunityTarget<UdpAddress> createTarget(String ip, int port, String community) {
+        return createTarget(ip, port, community, DEFAULT_TIMEOUT, DEFAULT_RETRIES);
+    }
+
+    private CommunityTarget<UdpAddress> createTarget(String ip, int port, String community,
+                                                     int timeoutMs, int retries) {
         CommunityTarget<UdpAddress> target = new CommunityTarget<>();
         target.setCommunity(new OctetString(community));
         target.setAddress(new UdpAddress(ip + "/" + port));
-        target.setRetries(DEFAULT_RETRIES);
-        target.setTimeout(DEFAULT_TIMEOUT);
+        target.setRetries(retries);
+        target.setTimeout(timeoutMs);
         target.setVersion(SnmpConstants.version2c);
         return target;
     }

@@ -1119,6 +1119,7 @@ import {
   Delete, List, Download, Edit, Plus, Menu, Grid, Loading, Share, DArrowLeft, DArrowRight
 } from '@element-plus/icons-vue'
 import { deviceApi, alarmApi, performanceApi, configApi } from '@/api/device'
+import { useProjectStore } from '@/stores/project'
 import { topologyApi } from '@/api/topology'
 import { useAuthStore } from '@/stores/auth'
 import { openWebTerminal } from '@/composables/webTerminalBus'
@@ -1218,6 +1219,7 @@ const currentLayout = ref('force')
 const VIEW_MODE_KEY = 'topology-view-mode'
 const viewMode = ref(localStorage.getItem(VIEW_MODE_KEY) === 'edit' ? 'edit' : 'monitor')
 const auth = useAuthStore()
+const projectStore = useProjectStore()
 if (!auth.hasPermission('topology:write')) {
   viewMode.value = 'monitor'
 }
@@ -2124,8 +2126,8 @@ const loadTopology = async (silent = false) => {
       topologyLoading.value = true
       topologyLoadError.value = ''
     }
-    // ===== 1. 获取原始数据 =====
-    const topologyRes = await topologyApi.getFullTopology()
+    // ===== 1. 获取原始数据（按当前工程裁剪：节点=本工程设备，链路=两端同属本工程）=====
+    const topologyRes = await topologyApi.getFullTopology(projectStore.projectId)
 
     let nodes = []
     let linkList = []
@@ -2137,6 +2139,9 @@ const loadTopology = async (silent = false) => {
     if (topologyRes && topologyRes.links) {
       linkList = topologyRes.links
     }
+
+    // 工程裁剪在后端完成（项目上下文只认一个工程），前端不再二次过滤，
+    // 以免链路字段名与节点 id 口径不一致导致"节点还在、连线全丢"。
 
     // ===== 2. 规范化设备和链路 =====
     const nodeList = nodes.map(n => ({
@@ -4454,6 +4459,14 @@ const handleResize = () => {
     graph.changeSize(w, h)
   }
 }
+
+// 顶栏切换工程 → 重新加载工程内拓扑
+watch(
+  () => projectStore.projectId,
+  () => {
+    loadTopology()
+  }
+)
 
 watch(sidebarCollapsed, () => {
   setTimeout(handleResize, 220)

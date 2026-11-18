@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>probe</title>
+    <style>
+      html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; }
+      iframe { display: block; width: 100%; height: 100%; border: 0; }
+    </style>
+  </head>
+  <body>
+    <script>
+      (async () => {
+        const q = new URLSearchParams(location.search)
+        const target = q.get('to') || '/acceptance/report'
+        try {
+          const r = await fetch('/api/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: 'player4', password: 'Player@123' })
+          })
+          const d = await r.json()
+          localStorage.setItem('ensp_nms_token', d.token)
+          localStorage.setItem('ensp_nms_user', JSON.stringify(d))
+        } catch (e) {
+          document.title = 'login-failed'
+        }
+        const f = document.createElement('iframe')
+        f.src = target
+        document.body.appendChild(f)
+        // 可选：加载后自动点击某个元素（用于截抽屉/弹窗），?click=CSS选择器&delay=毫秒
+        const sel = q.get('click')
+        if (sel) {
+          f.addEventListener('load', () => {
+            setTimeout(() => {
+              try {
+                const el = f.contentDocument.querySelector(sel)
+                if (el) el.click()
+                const sc = q.get('scrollsel')
+                if (sc) {
+                  setTimeout(() => {
+                    f.contentDocument.querySelector(sc)?.scrollIntoView({ block: 'center' })
+                  }, 400)
+                }
+              } catch (e) {
+                document.title = 'click-failed'
+              }
+            }, Number(q.get('delay') || 1500))
+          })
+        }
+      })()
+    </script>
+  </body>
+</html>

@@ -147,7 +147,13 @@ public class DeviceConfigController {
             }
             String content = request.get("content") != null ? request.get("content").toString() : "";
             boolean enableVariables = request.get("enableVariables") != null && Boolean.parseBoolean(request.get("enableVariables").toString());
-            Map<String, Object> preview = deviceConfigService.previewBatchApply(deviceIds, content, enableVariables);
+            List<Map<String, String>> variableSets = parseVariableSets(request.get("variableSets"));
+            Map<String, Object> preview;
+            if (!variableSets.isEmpty()) {
+                preview = deviceConfigService.previewBatchVariableSets(deviceIds, content, variableSets);
+            } else {
+                preview = deviceConfigService.previewBatchApply(deviceIds, content, enableVariables);
+            }
             preview.put("success", true);
             return ResponseEntity.ok(preview);
         } catch (Exception e) {
@@ -244,6 +250,28 @@ public class DeviceConfigController {
         return ids;
     }
 
+    /** 变量集解析：[{room:"501",vlan:"51"},...] → List<Map>；非法项跳过 */
+    private static List<Map<String, String>> parseVariableSets(Object raw) {
+        List<Map<String, String>> out = new java.util.ArrayList<>();
+        if (!(raw instanceof List<?> list)) {
+            return out;
+        }
+        for (Object o : list) {
+            if (o instanceof Map<?, ?> m) {
+                Map<String, String> vars = new LinkedHashMap<>();
+                m.forEach((k, v) -> {
+                    if (k != null && !String.valueOf(k).isBlank()) {
+                        vars.put(String.valueOf(k).trim(), v == null ? "" : String.valueOf(v));
+                    }
+                });
+                if (!vars.isEmpty()) {
+                    out.add(vars);
+                }
+            }
+        }
+        return out;
+    }
+
     private static List<Long> parseConfigIds(Object raw) {
         if (!(raw instanceof List<?> list)) {
             return List.of();
@@ -325,9 +353,19 @@ public class DeviceConfigController {
             if (request.get("waveSize") != null) {
                 waveSize = Integer.parseInt(request.get("waveSize").toString());
             }
+            List<Map<String, String>> variableSets = parseVariableSets(request.get("variableSets"));
 
-            ConfigTaskState task = configTaskService.submitBatchApply(
-                    deviceIds, content, enableVariables, parallel, reason, waveSize, null);
+            ConfigTaskState task;
+            if (!variableSets.isEmpty()) {
+                if (deviceIds.isEmpty()) {
+                    return ResponseEntity.badRequest().body(Map.of("success", false, "message", "请选择设备"));
+                }
+                // 变量集模式：每组变量渲染一段配置，段×设备逐对下发（分波不支持，waveSize 忽略）
+                task = configTaskService.submitBatchVariableSets(deviceIds, content, variableSets, parallel, reason);
+            } else {
+                task = configTaskService.submitBatchApply(
+                        deviceIds, content, enableVariables, parallel, reason, waveSize, null);
+            }
             return ResponseEntity.ok(Map.of("success", true, "taskId", task.getId(), "task", task.toMap()));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("success", false, "message", e.getMessage()));

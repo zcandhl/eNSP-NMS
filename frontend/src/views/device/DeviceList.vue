@@ -157,6 +157,10 @@
                 <button type="button" class="nms-device-name" @click="openDetail(row)">{{ row.name }}</button>
                 <div class="dev-type-line">
                   {{ deviceTypeLabel(row.deviceType) }}
+                  <span
+                    class="dev-proto"
+                    :class="(row.managementProtocol || 'ssh').toLowerCase()"
+                  >{{ protocolShort(row.managementProtocol) }}</span>
                 </div>
               </div>
             </div>
@@ -257,6 +261,28 @@
     </div>
   </div>
 
+  <!-- 录入方式选择：工程页“录入设备”直达时先让用户选，不强制弹表单 -->
+  <el-dialog v-model="entryChooserVisible" title="设备录入" width="560px">
+    <p class="entry-chooser-tip">
+      当前工程「{{ activeProjectName }}」还没有纳管设备。选择一种录入方式，或先浏览设备列表：
+    </p>
+    <div class="entry-chooser">
+      <button type="button" class="entry-opt" v-permission="'devices:discover'" @click="chooseEntry('discover')">
+        <el-icon class="entry-ico"><Search /></el-icon>
+        <span class="entry-name">自动发现</span>
+        <span class="entry-desc">扫描同网段设备，批量纳管并绑定本工程</span>
+      </button>
+      <button type="button" class="entry-opt" v-permission="'devices:write'" @click="chooseEntry('add')">
+        <el-icon class="entry-ico"><Plus /></el-icon>
+        <span class="entry-name">手动录入</span>
+        <span class="entry-desc">逐台登记设备名称、地址与凭据</span>
+      </button>
+    </div>
+    <template #footer>
+      <el-button @click="entryChooserVisible = false">先浏览设备列表</el-button>
+    </template>
+  </el-dialog>
+
   <el-dialog
     v-model="showAddDialog"
     :title="editMode ? '编辑设备' : '添加设备'"
@@ -323,12 +349,27 @@
           </el-select>
         </el-form-item>
         <el-form-item label="Community">
-          <el-input v-model="deviceForm.snmpCommunity" />
+          <el-input v-model="deviceForm.snmpCommunity" placeholder="区分大小写，如 public / Public" />
         </el-form-item>
         <el-form-item label="端口">
           <el-input-number v-model="deviceForm.snmpPort" :min="1" :max="65535" />
         </el-form-item>
-        <el-divider content-position="left">SSH配置（可选）</el-divider>
+        <el-divider content-position="left">远程管理（SSH / Telnet）</el-divider>
+        <el-form-item label="管理协议">
+          <el-select
+            v-model="deviceForm.managementProtocol"
+            style="width: 100%"
+            @change="onManagementProtocolChange"
+          >
+            <el-option
+              v-for="opt in PROTOCOL_OPTIONS"
+              :key="opt.value"
+              :label="opt.label"
+              :value="opt.value"
+            />
+          </el-select>
+          <div class="ssh-hint">AC6005 在 eNSP 中 SSH 不可用，请选择 Telnet</div>
+        </el-form-item>
         <el-form-item label="用户名">
           <el-input
             v-model="deviceForm.sshUsername"
@@ -345,20 +386,37 @@
             clearable
             autocomplete="new-password"
             name="nms-ssh-password"
-            :placeholder="editMode ? '输入新密码；留空则保持原密码' : '请输入 SSH 密码'"
+            :placeholder="editMode ? '输入新密码；留空则保持原密码' : '请输入远程管理密码'"
           />
         </el-form-item>
         <el-form-item label="端口">
           <el-input-number v-model="deviceForm.sshPort" :min="1" :max="65535" />
+          <span class="ssh-hint">{{ deviceForm.managementProtocol === 'telnet' ? 'Telnet 默认 23' : 'SSH 默认 22' }}</span>
         </el-form-item>
         <el-form-item v-if="editMode && deviceForm.id" label="连通性">
           <el-button
             :loading="testingConn"
             @click="testConnectivityFromForm"
           >连通性诊断</el-button>
-          <span class="ssh-hint">ICMP / SNMP / SSH（诊断用，不改在线状态）</span>
+          <span class="ssh-hint">ICMP / SNMP / 远程管理（诊断用，不改在线状态）</span>
         </el-form-item>
       </template>
+      <el-form-item label="所属工程">
+        <el-select
+          v-model="deviceForm.projectId"
+          clearable
+          filterable
+          placeholder="未分配工程"
+          style="width: 100%"
+        >
+          <el-option
+            v-for="p in projects"
+            :key="p.id"
+            :label="p.name"
+            :value="p.id"
+          />
+        </el-select>
+      </el-form-item>
       <el-form-item label="设备分组">
         <el-select v-model="deviceForm.groupId" clearable placeholder="未分组" style="width: 100%">
           <el-option
@@ -585,6 +643,8 @@ import { ArrowDown, Search, Plus, Refresh, Edit, MoreFilled, Box, CircleCheck, W
 import { deviceApi, deviceGroupApi } from '@/api/device'
 import { useDeviceStore } from '@/stores/device'
 import { useAuthStore } from '@/stores/auth'
+import { useProjectStore } from '@/stores/project'
+import { storeToRefs } from 'pinia'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { openWebTerminal } from '@/composables/webTerminalBus'
 import { askOpsAssistant } from '@/composables/askOpsAssistant'
@@ -593,7 +653,9 @@ import DeviceDetailDrawer from '@/components/DeviceDetailDrawer.vue'
 import {
   DEVICE_TYPE_OPTIONS,
   MONITOR_MODE_OPTIONS,
+  PROTOCOL_OPTIONS,
   deviceTypeLabel,
+  protocolShort,
   resolveCapabilities,
   canUseWebSsh,
   canCollectPerformance,
@@ -644,7 +706,9 @@ const emptyForm = () => ({
   sshUsername: '',
   sshPassword: '',
   sshPort: 22,
+  managementProtocol: 'ssh',
   groupId: null,
+  projectId: null,
   location: '',
   contact: '',
   serialNumber: '',
@@ -667,10 +731,26 @@ const discovering = ref(false)
 const endpointDiscovering = ref(false)
 const importing = ref(false)
 const showAddDialog = ref(false)
+
+// ── 录入方式选择（工程页“录入设备”直达） ──
+const entryChooserVisible = ref(false)
+const activeProjectName = computed(
+  () => projects.value.find((p) => p.id === projectId.value)?.name || ''
+)
+const chooseEntry = (mode) => {
+  entryChooserVisible.value = false
+  if (mode === 'discover') openDiscoverDialog()
+  else openAddDialog()
+}
 const showDiscoverDialog = ref(false)
 const editMode = ref(false)
 const formNonce = ref(0)
 const deviceForm = ref(emptyForm())
+
+// 全局工程上下文：设备列表按当前工程过滤，新建设备默认归入当前工程
+const projectStore = useProjectStore()
+const { projects, projectId } = storeToRefs(projectStore)
+
 const filters = ref({
   keyword: '',
   status: '',
@@ -724,6 +804,15 @@ const autoRefreshHint = computed(() => {
   return `${Math.floor(sec / 60)}m 前同步`
 })
 
+// 顶栏切换工程 → 重新加载设备列表
+watch(
+  () => projectStore.projectId,
+  () => {
+    pagination.value.page = 1
+    loadDevices()
+  }
+)
+
 const loadDevices = async (silent = false) => {
   if (silent) {
     if (silentRefreshing.value || loading.value) return
@@ -738,6 +827,7 @@ const loadDevices = async (silent = false) => {
       keyword: filters.value.keyword || undefined,
       status: filters.value.status || undefined,
       groupId: filters.value.groupId != null ? filters.value.groupId : undefined,
+      projectId: projectId.value || undefined,
       deviceType: filters.value.deviceType || undefined,
       monitorMode: filters.value.monitorMode || undefined,
       page: Math.max(pagination.value.page - 1, 0),
@@ -1303,6 +1393,17 @@ const testConnectivityFromForm = async () => {
   }
 }
 
+/** 切换协议时同步默认端口：Telnet 23 / SSH 22，避免用户在错误端口上排查 */
+const onManagementProtocolChange = (protocol) => {
+  if (protocol === 'telnet') {
+    if (!deviceForm.value.sshPort || deviceForm.value.sshPort === 22) {
+      deviceForm.value.sshPort = 23
+    }
+  } else if (deviceForm.value.sshPort === 23) {
+    deviceForm.value.sshPort = 22
+  }
+}
+
 /** 编辑时只拷贝可编辑字段，绝不绑定表格行引用，避免同名设备互相串改 */
 const editDevice = (device) => {
   if (!device || device.id == null) {
@@ -1324,8 +1425,10 @@ const editDevice = (device) => {
     snmpPort: device.snmpPort || 161,
     sshUsername: device.sshUsername || '',
     sshPassword: '',
-    sshPort: device.sshPort || 22,
+    sshPort: device.sshPort || ((device.managementProtocol || 'ssh') === 'telnet' ? 23 : 22),
+    managementProtocol: device.managementProtocol || 'ssh',
     groupId: device.groupId ?? null,
+    projectId: device.projectId ?? null,
     location: device.location || '',
     contact: device.contact || '',
     serialNumber: device.serialNumber || '',
@@ -1350,7 +1453,8 @@ const resetForm = () => {
 const openAddDialog = () => {
   editMode.value = false
   formNonce.value += 1
-  deviceForm.value = emptyForm()
+  // 新建设备默认归入当前工程（全局上下文）
+  deviceForm.value = { ...emptyForm(), projectId: projectId.value || null }
   showAddDialog.value = true
 }
 
@@ -1401,6 +1505,7 @@ const saveDevice = async () => {
         snmpPort: deviceForm.value.snmpPort,
         sshUsername: deviceForm.value.sshUsername,
         sshPort: deviceForm.value.sshPort,
+        managementProtocol: deviceForm.value.managementProtocol || 'ssh',
         groupId: deviceForm.value.groupId ?? null,
         location: deviceForm.value.location || '',
         contact: deviceForm.value.contact || '',
@@ -1556,7 +1661,8 @@ const importSelected = async () => {
   }
   importing.value = true
   try {
-    const res = await deviceApi.importDiscovered(selectedCandidates.value)
+    // 新发现设备直接归属当前工程，否则列表按工程过滤会看不到
+    const res = await deviceApi.importDiscovered(selectedCandidates.value, projectStore.projectId)
     const count = res?.imported ?? (Array.isArray(res?.devices) ? res.devices.length : 0)
     ElMessage.success(`已入库 ${count} 台设备`)
     showDiscoverDialog.value = false
@@ -1576,6 +1682,18 @@ const applyRouteQuery = () => {
   }
   if (route.query.discover === '1' || route.query.discover === 'true') {
     openDiscoverDialog()
+  }
+  // 工程页「录入设备」直达：先弹出录入方式选择，不强制打开表单
+  if (route.query.intent === 'entry' || route.query.add === '1' || route.query.add === 'true') {
+    openEntryChooser()
+  }
+}
+
+const openEntryChooser = () => {
+  entryChooserVisible.value = true
+  // 用完即清，避免刷新/返回时重复弹出
+  if (route.query.intent || route.query.add) {
+    router.replace({ query: { ...route.query, intent: undefined, add: undefined } })
   }
 }
 
@@ -1598,7 +1716,7 @@ onMounted(async () => {
 })
 
 watch(
-  () => [route.query.keyword, route.query.q, route.query.discover, route.query.deviceId],
+  () => [route.query.keyword, route.query.q, route.query.discover, route.query.deviceId, route.query.intent],
   async () => {
     applyRouteQuery()
     if (route.query.keyword || route.query.q) {
@@ -1643,6 +1761,24 @@ onUnmounted(() => {
   flex-wrap: wrap;
 }
 
+/* 远程管理协议标记：SSH 常规色，Telnet 用提示色提醒明文风险 */
+.dev-proto {
+  font-size: 10px;
+  line-height: 1;
+  padding: 2px 5px;
+  border-radius: 4px;
+  border: 1px solid currentColor;
+  opacity: 0.85;
+}
+
+.dev-proto.ssh {
+  color: #15803d;
+}
+
+.dev-proto.telnet {
+  color: #b45309;
+}
+
 .last-seen {
   font-size: 12px;
   color: var(--nms-text-secondary);
@@ -1667,5 +1803,51 @@ onUnmounted(() => {
 
 :deep(.danger-item) {
   color: var(--el-color-danger);
+}
+</style>
+
+<style scoped>
+/* ── 录入方式选择对话框 ── */
+.entry-chooser-tip {
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: #64748b;
+}
+.entry-chooser {
+  display: flex;
+  gap: 12px;
+}
+.entry-opt {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 16px 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #f8fafc;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.15s, background 0.15s, transform 0.15s;
+}
+.entry-opt:hover {
+  border-color: #2563eb;
+  background: #eff6ff;
+  transform: translateY(-1px);
+}
+.entry-ico {
+  font-size: 22px;
+  color: #2563eb;
+}
+.entry-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1e293b;
+}
+.entry-desc {
+  font-size: 12px;
+  line-height: 1.5;
+  color: #64748b;
 }
 </style>

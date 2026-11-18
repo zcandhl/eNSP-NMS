@@ -30,16 +30,23 @@ public class WebSshController {
             if (device.getSshUsername() == null || device.getSshPassword() == null) {
                 return ResponseEntity.badRequest().body(Map.of(
                     "success", false,
-                    "message", "SSH credentials not configured"
+                    "message", "该设备未配置远程管理账号或密码"
                 ));
             }
-            
+
+            // AC 类设备走 telnet（其 SSH 服务在 eNSP 中不可用），其余走 SSH
+            String protocol = device.isTelnetManagement()
+                    ? SshClient.PROTOCOL_TELNET : SshClient.PROTOCOL_SSH;
+            int port = device.getSshPort() != null && device.getSshPort() > 0
+                    ? device.getSshPort() : SshClient.defaultPort(protocol);
+
             String output = sshClient.executeCommand(
                 device.getIpAddress(),
-                device.getSshPort(),
+                port,
                 device.getSshUsername(),
                 device.getSshPassword(),
-                command
+                command,
+                protocol
             );
             
             return ResponseEntity.ok(Map.of(

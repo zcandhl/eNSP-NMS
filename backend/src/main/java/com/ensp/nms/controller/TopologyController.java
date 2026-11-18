@@ -23,8 +23,9 @@ public class TopologyController {
     private final TopologyDiscoveryService topologyDiscoveryService;
 
     @GetMapping
-    public ResponseEntity<Map<String, Object>> getFullTopology() {
-        return ResponseEntity.ok(topologyService.getFullTopology());
+    public ResponseEntity<Map<String, Object>> getFullTopology(
+            @RequestParam(required = false) Long projectId) {
+        return ResponseEntity.ok(topologyService.getFullTopology(projectId));
     }
 
     @PostMapping("/nodes/{deviceId}/position")

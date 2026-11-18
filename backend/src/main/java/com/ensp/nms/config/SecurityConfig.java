@@ -107,6 +107,12 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.POST, "/api/performance-alerts/**")
                     .hasAuthority("alarms:handle")
 
+                // 验收工作台：读=查看权限，写（跑验收/改方案/出报告）=配置写权限
+                .requestMatchers(HttpMethod.GET, "/api/acceptance/**")
+                    .hasAnyAuthority("configs:read", "devices:read")
+                .requestMatchers("/api/acceptance/**")
+                    .hasAnyAuthority("configs:write", "devices:write")
+
                 // WebSSH HTTP API
                 .requestMatchers("/api/webssh/**").hasAuthority("webssh:connect")
 

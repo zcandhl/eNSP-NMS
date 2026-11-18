@@ -21,6 +21,8 @@ public final class TrapOidClassifier {
             "^\\s*([^=\\n]+?)\\s*=\\s*(.+?)\\s*$", Pattern.MULTILINE);
     private static final Pattern REPEAT_SUFFIX = Pattern.compile(
             "(?s)(\\n?\\[重复 \\d+ 次.*?\\]\\s*)$");
+    /** vrrpOperMasterIpAddr（VRRP-MIB 68.1.3.1.7）：Master 设备实际 IP，索引 ifIndex.VrId */
+    private static final String VRRP_MASTER_IP_PREFIX = "1.3.6.1.2.1.68.1.3.1.7.";
 
     private TrapOidClassifier() {
     }
@@ -91,6 +93,53 @@ public final class TrapOidClassifier {
                 return new Classified("OSPF接口状态变更", "路由告警-OSPF接口状态变更", Alarm.Severity.WARNING);
             }
             return new Classified("OSPF路由事件", "路由告警-OSPF", Alarm.Severity.WARNING);
+        }
+
+        // VRRP：标准 VRRP-MIB（RFC 2787/3768，mib-2.68）+ 华为私有 hwVrrpExt 扩展
+        if (oidIs(oid, "1.3.6.1.2.1.68.0.1")) {
+            // vrrpTrapNewMaster：VRRP 状态切换为 Master（主备切换事件），华为文档级别 Warning
+            return new Classified("VRRP主备切换告警", "路由告警-VRRP主备切换", Alarm.Severity.WARNING);
+        }
+        if (oidIs(oid, "1.3.6.1.2.1.68.0.2")) {
+            // vrrpTrapAuthFailure：收到与本端认证方式/认证字冲突的 VRRP 报文
+            return new Classified("VRRP报文认证冲突", "路由告警-VRRP认证失败", Alarm.Severity.WARNING);
+        }
+        if (oidIs(oid, "1.3.6.1.4.1.2011.5.25.127.2.30.1")) {
+            // hwVrrpExtTrapMasterDown：Master 设备失效（主备切换的故障侧原因）
+            return new Classified("VRRP主设备失效", "路由告警-VRRP主设备失效", Alarm.Severity.MAJOR);
+        }
+        if (oidIs(oid, "1.3.6.1.4.1.2011.5.25.127.2.30.2")) {
+            // hwVrrpExtTrapNonMaster：设备处于非 Master 状态
+            return new Classified("VRRP非Master状态", "路由告警-VRRP非Master状态", Alarm.Severity.WARNING);
+        }
+        if (oid.contains("1.3.6.1.2.1.68.0.")
+                || oid.contains("1.3.6.1.4.1.2011.5.25.127.2.30.")) {
+            return new Classified("VRRP状态事件", "路由告警-VRRP", Alarm.Severity.WARNING);
+        }
+
+        // STP/MSTP：标准 BRIDGE-MIB dot1dTraps（mib-2.17）
+        if (oidIs(oid, "1.3.6.1.2.1.17.0.1")) {
+            return new Classified("STP生成树新根事件", "交换告警-STP新根", Alarm.Severity.WARNING);
+        }
+        if (oidIs(oid, "1.3.6.1.2.1.17.0.2")) {
+            return new Classified("STP拓扑变更告警", "交换告警-STP拓扑变更", Alarm.Severity.WARNING);
+        }
+
+        // WLAN：HUAWEI-WLAN-AP-MIB（AP）与 HUAWEI-WLAN-STA-MIB（终端）
+        if (oidIs(oid, "1.3.6.1.4.1.2011.6.139.13.1.1.1")) {
+            return new Classified("AP下线告警", "WLAN告警-AP下线", Alarm.Severity.MAJOR);
+        }
+        if (oidIs(oid, "1.3.6.1.4.1.2011.6.139.13.1.1.2")) {
+            return new Classified("AP上线恢复通知", "WLAN告警-AP上线", Alarm.Severity.INFO);
+        }
+        if (oidIs(oid, "1.3.6.1.4.1.2011.6.139.18.1.1.1.9")) {
+            return new Classified("无线终端上线", "WLAN告警-终端上线", Alarm.Severity.INFO);
+        }
+        if (oidIs(oid, "1.3.6.1.4.1.2011.6.139.18.1.1.1.10")) {
+            return new Classified("无线终端下线", "WLAN告警-终端下线", Alarm.Severity.INFO);
+        }
+        if (oid.startsWith("1.3.6.1.4.1.2011.6.139.")) {
+            return new Classified("WLAN设备事件", "WLAN告警-华为WLAN", Alarm.Severity.WARNING);
         }
 
         return null;
@@ -183,6 +232,23 @@ public final class TrapOidClassifier {
             }
         }
 
+        // VRRP 关键：vrrpOperMasterIpAddr (1.3.6.1.2.1.68.1.3.1.7)，索引 = ifIndex.VrId
+        String vrrpMasterIp = firstVbByPrefix(vb, VRRP_MASTER_IP_PREFIX);
+        String vrrpIndex = vbIndexByPrefix(vb, VRRP_MASTER_IP_PREFIX);
+        if (vrrpMasterIp != null || vrrpIndex != null || type.contains("VRRP")) {
+            sb.append('\n').append("【VRRP】\n");
+            if (vrrpIndex != null && vrrpIndex.contains(".")) {
+                String[] idx = vrrpIndex.split("\\.");
+                if (idx.length >= 2) {
+                    sb.append("接口索引: ").append(idx[idx.length - 2]).append('\n');
+                    sb.append("备份组VRID: ").append(idx[idx.length - 1]).append('\n');
+                }
+            }
+            if (vrrpMasterIp != null) {
+                sb.append("新Master地址: ").append(vrrpMasterIp).append('\n');
+            }
+        }
+
         // 接口
         String ifName = firstVbByPrefix(vb, "1.3.6.1.2.1.31.1.1.1.1.");
         String ifDescr = firstVbByPrefix(vb, "1.3.6.1.2.1.2.2.1.2.");
@@ -266,6 +332,48 @@ public final class TrapOidClassifier {
         if (type.contains("接口恢复")) {
             return "本端接口运行状态已恢复为 up。";
         }
+        if (type.contains("VRRP主备切换")) {
+            StringBuilder s = new StringBuilder(
+                    "VRRP 备份组发生主备切换，该设备已切换为 Master，网关流量路径随之改变。");
+            String idx = vbIndexByPrefix(vb, VRRP_MASTER_IP_PREFIX);
+            if (idx != null && idx.contains(".")) {
+                String[] p = idx.split("\\.");
+                s.append(" 备份组VRID=").append(p[p.length - 1]).append("。");
+            }
+            String ip = firstVbByPrefix(vb, VRRP_MASTER_IP_PREFIX);
+            if (ip != null) {
+                s.append(" 新Master=").append(ip).append("。");
+            }
+            s.append(" 请确认切换原因：对端故障/优先级调整/抢占，并关注业务是否恢复。");
+            return s.toString();
+        }
+        if (type.contains("VRRP主设备失效")) {
+            return "VRRP Master 设备失效（如接口 down 或整机故障），备份组触发主备切换。请检查原 Master 设备及上行链路。";
+        }
+        if (type.contains("VRRP认证")) {
+            return "收到与本端 VRRP 备份组认证方式或认证字冲突的报文，请检查两端 authentication-mode 配置是否一致。";
+        }
+        if (type.contains("VRRP")) {
+            return "VRRP 备份组状态事件，请结合 display vrrp 核对主备状态与优先级配置。";
+        }
+        if (type.contains("AP下线")) {
+            return "AP 与 AC 断连（可能为链路断开/断电/心跳丢失/license 不足），该 AP 上的无线业务中断。请检查 AP 与 AC 间的网络及 AP 供电。";
+        }
+        if (type.contains("AP上线")) {
+            return "AP 与 AC 重新建立 CAPWAP 隧道并恢复上线，无线业务恢复。";
+        }
+        if (type.contains("终端上线")) {
+            return "无线终端(STA)关联上线。";
+        }
+        if (type.contains("终端下线")) {
+            return "无线终端(STA)去关联下线。";
+        }
+        if (type.contains("STP新根")) {
+            return "生成树协议选出新的根桥，交换拓扑发生变化。请确认是否为预期内的链路调整。";
+        }
+        if (type.contains("STP拓扑")) {
+            return "生成树拓扑发生变更，MAC 地址表将重新收敛。若频繁出现，请排查环路或链路抖动。";
+        }
         if (type.contains("冷启动") || type.contains("热启动")) {
             return "设备发生重启类事件，请确认是否计划内操作。";
         }
@@ -318,6 +426,19 @@ public final class TrapOidClassifier {
             if (e.getKey() != null && e.getKey().startsWith(prefix)
                     && e.getValue() != null && !e.getValue().isBlank()) {
                 return e.getValue().trim();
+            }
+        }
+        return null;
+    }
+
+    /** 取 varbind OID 中 prefix 之后的索引段（如 .26.70 → "26.70"） */
+    private static String vbIndexByPrefix(Map<String, String> vb, String prefix) {
+        if (vb == null || prefix == null) {
+            return null;
+        }
+        for (String k : vb.keySet()) {
+            if (k != null && k.startsWith(prefix) && k.length() > prefix.length()) {
+                return k.substring(prefix.length());
             }
         }
         return null;

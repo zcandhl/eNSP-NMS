@@ -30,4 +30,9 @@ public interface AiopsUnattendedRunRepository extends JpaRepository<AiopsUnatten
     @Modifying
     @Query("DELETE FROM AiopsUnattendedRun r WHERE r.startedAt < :cutoff")
     int deleteByStartedAtBefore(@Param("cutoff") LocalDateTime cutoff);
+
+    /** 删除设备时解除历史运行记录的外键引用（保留审计历史，device_id 允许为空） */
+    @Modifying
+    @Query("UPDATE AiopsUnattendedRun r SET r.deviceId = NULL WHERE r.deviceId = :deviceId")
+    int detachDevice(@Param("deviceId") Long deviceId);
 }

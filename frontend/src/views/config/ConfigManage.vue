@@ -471,6 +471,28 @@
                     <el-form-item label="变量替换">
                       <el-switch v-model="batchEnableVariables" active-text="启用 ${name}/${ipAddress} 等" />
                     </el-form-item>
+                    <el-form-item label="变量集模式">
+                      <div style="width: 100%;">
+                        <el-switch v-model="batchVarSetsEnabled" active-text="一次多组变量 → 多段独立配置" />
+                        <div v-if="batchVarSetsEnabled" style="margin-top: 8px;">
+                          <el-input
+                            v-model="batchVarSetsCsv"
+                            type="textarea"
+                            :rows="7"
+                            placeholder="首行为变量名，之后每行一组变量（逗号分隔）。例：&#10;room,vlan,net,gateway,pool&#10;501,51,10.20.51.0,10.20.51.254,POOL-501&#10;513,63,10.20.63.0,10.20.63.254,POOL-513&#10;命令中用 ${room} ${vlan} 引用"
+                          />
+                          <div class="form-hint" style="margin-top: 4px;">
+                            <template v-if="batchVarSetsParsed.errors.length">
+                              <span style="color: var(--el-color-danger);">{{ batchVarSetsParsed.errors.join('；') }}</span>
+                            </template>
+                            <template v-else-if="batchVarSetsParsed.rows.length">
+                              解析到 {{ batchVarSetsParsed.rows.length }} 组变量 × {{ batchSelectedDevices.length }} 台设备 = {{ batchVarSetsParsed.rows.length * batchSelectedDevices.length }} 次下发；每组变量渲染一段独立配置
+                            </template>
+                            <template v-else>请按“首行变量名 + 每行一组”粘贴变量表</template>
+                          </div>
+                        </div>
+                      </div>
+                    </el-form-item>
                   </template>
 
                   <template v-else-if="batchForm.configType === 'interface'">
@@ -717,8 +739,28 @@
                     </template>
                   </el-table-column>
                 </el-table>
+                <el-table v-if="batchPreviewSummary.segments" :data="batchPreviewSummary.segments" size="small" style="margin-top: 10px;" max-height="260">
+                  <el-table-column prop="segmentIndex" label="段" width="60" />
+                  <el-table-column label="变量" width="220" show-overflow-tooltip>
+                    <template #default="{ row }">
+                      {{ Object.entries(row.variables || {}).map(([k, v]) => `${k}=${v}`).join('，') }}
+                    </template>
+                  </el-table-column>
+                  <el-table-column prop="commandCount" label="命令行" width="80" />
+                  <el-table-column label="未替换占位符" width="110">
+                    <template #default="{ row }">
+                      <el-tag v-if="row.unresolvedPlaceholders > 0" type="warning" size="small">{{ row.unresolvedPlaceholders }} 处</el-tag>
+                      <el-tag v-else type="success" size="small">无</el-tag>
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="渲染预览" min-width="240">
+                    <template #default="{ row }">
+                      <pre style="margin: 0; white-space: pre-wrap; font-size: 12px;">{{ row.commandsPreview }}</pre>
+                    </template>
+                  </el-table-column>
+                </el-table>
               </div>
-              <div class="preview-list">
+              <div v-if="!batchVarSetsEnabled" class="preview-list">
                 <div
                   v-for="preview in batchPreviews"
                   :key="preview.deviceId"
@@ -1649,6 +1691,8 @@ const batchLoading = ref(false)
 const batchProgress = ref(0)
 const batchProgressText = ref('准备下发...')
 const batchEnableVariables = ref(false)
+const batchVarSetsEnabled = ref(false)
+const batchVarSetsCsv = ref('')
 const batchReason = ref('')
 const batchWaveSize = ref(0)
 const batchPreviewLoading = ref(false)
@@ -1873,6 +1917,36 @@ const batchCommandsNeedVars = (commands) => {
   return batchEnableVariables.value
     || (t === 'ospf' && p.enableRouterId && hasBatchVar(p.routerId || '${ipAddress}'))
     || hasBatchVar(cmd)
+}
+
+/** 变量集 CSV 解析：首行变量名，之后每行一组（逗号分隔） */
+const parseVarSetsCsv = (text) => {
+  const rows = []
+  const errors = []
+  const lines = String(text || '').split(/\r?\n/).map(s => s.trim()).filter(Boolean)
+  let headers = []
+  if (lines.length) {
+    headers = lines[0].split(',').map(s => s.trim()).filter(Boolean)
+    if (!headers.length) errors.push('首行未解析到变量名')
+    for (let i = 1; i < lines.length; i++) {
+      const cols = lines[i].split(',').map(s => s.trim())
+      if (cols.length < headers.length) {
+        errors.push(`第 ${i + 1} 行列数不足`)
+        continue
+      }
+      const vars = {}
+      headers.forEach((h, idx) => { vars[h] = cols[idx] ?? '' })
+      rows.push(vars)
+    }
+  }
+  return { headers, rows, errors }
+}
+
+const batchVarSetsParsed = computed(() => parseVarSetsCsv(batchVarSetsCsv.value))
+
+const getBatchVariableSets = () => {
+  if (!batchVarSetsEnabled.value) return null
+  return batchVarSetsParsed.value.rows.length ? batchVarSetsParsed.value.rows : null
 }
 
 const batchSameParamRisk = computed(() => {
@@ -2253,6 +2327,10 @@ const executeBatchConfig = async (deviceIdsOverride = null) => {
     ElMessage.warning(validationError)
     return
   }
+  if (batchVarSetsEnabled.value && !getBatchVariableSets()) {
+    ElMessage.warning('变量集模式已开启，但未解析到有效变量行（首行变量名 + 每行一组）')
+    return
+  }
 
   const targetList = devices.value.filter(d => targetIds.includes(d.id))
   const offline = targetList.filter(d => d.status !== 'online')
@@ -2280,13 +2358,15 @@ const executeBatchConfig = async (deviceIdsOverride = null) => {
     const needVars = batchCommandsNeedVars(commands)
     batchLastCommands.value = commands
     batchLastEnableVariables.value = needVars
+    const variableSets = getBatchVariableSets()
 
     const started = await configApi.startBatchApplyTask(targetIds, {
       content: commands,
       enableVariables: needVars,
       parallel: false,
       reason: batchReason.value.trim() || '批量配置下发',
-      waveSize: Number(batchWaveSize.value) > 0 ? Number(batchWaveSize.value) : undefined
+      waveSize: variableSets ? undefined : (Number(batchWaveSize.value) > 0 ? Number(batchWaveSize.value) : undefined),
+      variableSets: variableSets || undefined
     })
     if (started?.needsApproval) {
       batchResultVisible.value = false
@@ -2308,6 +2388,14 @@ const executeBatchConfig = async (deviceIdsOverride = null) => {
     }))
     batchProgress.value = Number(task.progress || 100)
     batchProgressText.value = task.message || '下发完成！'
+
+    if (variableSets) {
+      batchResults.value = (res.results || []).map(r => ({
+        ...r,
+        deviceName: r.segmentIndex ? `段${r.segmentIndex} · ${r.deviceName}` : r.deviceName,
+        message: r.message || (r.success ? '成功' : (r.result || '失败'))
+      }))
+    }
 
     if (task.status === 'PAUSED') {
       ElMessage.warning(task.message || `首波完成，待继续 ${res.pendingCount || 0} 台，请到任务中心继续`)
@@ -2332,6 +2420,8 @@ const executeBatchConfig = async (deviceIdsOverride = null) => {
       batchForm.value.params.customContent = ''
       batchTemplateId.value = null
       batchEnableVariables.value = false
+      batchVarSetsEnabled.value = false
+      batchVarSetsCsv.value = ''
       batchReason.value = ''
       batchWaveSize.value = 0
       batchPreviewSummary.value = null
@@ -2361,9 +2451,16 @@ const runBatchPrecheck = async () => {
   try {
     const commands = buildBatchCommands()
     const needVars = batchCommandsNeedVars(commands)
+    const variableSets = getBatchVariableSets()
+    if (batchVarSetsEnabled.value && !variableSets) {
+      batchPreviewLoading.value = false
+      ElMessage.warning('变量集模式已开启，但未解析到有效变量行（首行变量名 + 每行一组）')
+      return
+    }
     const res = await configApi.previewBatchApply(targetIds, {
       content: commands,
-      enableVariables: needVars
+      enableVariables: needVars,
+      variableSets: variableSets || undefined
     })
     batchPreviewSummary.value = res
     ElMessage.success(res.message || '预检完成')
@@ -3415,7 +3512,7 @@ const exportConfig = async (config) => {
 }
 
 const formatTaskType = (type) => {
-  const map = { restore: '恢复', batch: '批量下发', backup: '批量备份' }
+  const map = { restore: '恢复', batch: '批量下发', batch_varsets: '变量集批量下发', backup: '批量备份' }
   return map[type] || type || '-'
 }
 
@@ -3448,6 +3545,7 @@ const formatChangeType = (type) => {
     backup: '备份',
     restore: '恢复',
     batch: '批量下发',
+    batch_apply_varsets: '变量集批量下发',
     apply: '应用模板',
     schedule: '定时备份'
   }

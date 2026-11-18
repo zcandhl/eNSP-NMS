@@ -113,7 +113,7 @@ public class PerformanceMonitorService {
             if (!Boolean.TRUE.equals(caps.get("performance"))) {
                 boolean up = Boolean.TRUE.equals(caps.get("icmp")) && icmpClient.ping(ip);
                 ConnectivityRecoveryService.ProbeApplyResult r =
-                        connectivityRecoveryService.applyProbeResult(device, up, "icmp");
+                        connectivityRecoveryService.applyProbeResult(device.getId(), up, "icmp");
                 if (r.isStatusChanged() || r.isSuspectedRecovery() || r.isRecoveryConfirmed()) {
                     log.info("设备 {} ({}) ICMP 探测: {}", device.getName(), ip, r.getMessage());
                 }
@@ -134,7 +134,7 @@ public class PerformanceMonitorService {
             }
 
             ConnectivityRecoveryService.ProbeApplyResult r =
-                    connectivityRecoveryService.applyProbeResult(device, reachable, probe);
+                    connectivityRecoveryService.applyProbeResult(device.getId(), reachable, probe);
             if (r.isStatusChanged() || r.isSuspectedRecovery() || (r.isRecoveryConfirmed() && r.getAlarmsCleared() > 0)) {
                 log.info("设备 {} ({}) 探测: {}", device.getName(), ip, r.getMessage());
             }
@@ -154,7 +154,7 @@ public class PerformanceMonitorService {
         } catch (Exception e) {
             log.error("检测设备 {} 状态失败: {}", device.getName(), e.getMessage());
             try {
-                connectivityRecoveryService.applyProbeResult(device, false,
+                connectivityRecoveryService.applyProbeResult(device.getId(), false,
                         DeviceType.fromCode(device.getDeviceType()) == DeviceType.PC ? "icmp" : "snmp");
             } catch (Exception ignored) {
                 // ignore

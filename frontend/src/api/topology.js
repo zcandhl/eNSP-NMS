@@ -1,8 +1,10 @@
 import request from './index'
 
 export const topologyApi = {
-  getFullTopology() {
-    return request.get('/topology')
+  // projectId 不传 = 全量拓扑；传了则由后端按工程裁设备与链路
+  getFullTopology(projectId) {
+    const params = projectId != null ? { projectId } : {}
+    return request.get('/topology', { params })
   },
 
   saveNodePosition(deviceId, x, y) {

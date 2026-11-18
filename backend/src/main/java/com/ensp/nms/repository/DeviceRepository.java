@@ -21,5 +21,9 @@ public interface DeviceRepository extends JpaRepository<Device, Long>, JpaSpecif
 
     List<Device> findByGroupId(Long groupId);
 
+    List<Device> findByProjectId(Long projectId);
+
+    long countByProjectId(Long projectId);
+
     boolean existsByIpAddress(String ipAddress);
 }

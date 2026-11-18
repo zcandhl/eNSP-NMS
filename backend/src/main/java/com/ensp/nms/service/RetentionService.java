@@ -58,6 +58,11 @@ public class RetentionService {
     @Scheduled(cron = "0 30 2 * * ?")
     @Transactional
     public void cleanupOldAlarms() {
+        // 先清孤儿告警：设备已删除/不在库中，却仍计入告警统计的记录
+        int orphans = alarmRepository.deleteOrphanAlarms();
+        if (orphans > 0) {
+            log.info("告警保留清理：删除孤儿告警（设备已不存在）{} 条", orphans);
+        }
         LocalDateTime clearedCutoff = LocalDateTime.now().minusDays(CLEARED_ALARM_RETENTION_DAYS);
         int cleared = alarmRepository.deleteClearedBefore(com.ensp.nms.entity.Alarm.Status.CLEARED, clearedCutoff);
         LocalDateTime maxCutoff = LocalDateTime.now().minusDays(ALARM_MAX_RETENTION_DAYS);

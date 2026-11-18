@@ -54,8 +54,12 @@ export const deviceApi = {
   getDiscoverJob(jobId) {
     return request.get(`/devices/discover/jobs/${jobId}`)
   },
-  importDiscovered(candidates) {
-    return request.post('/devices/discover/import', { candidates })
+  /** candidates 入库；projectId 传入当前工程，让新设备直接归属该工程 */
+  importDiscovered(candidates, projectId) {
+    return request.post('/devices/discover/import', {
+      candidates,
+      ...(projectId ? { projectId } : {})
+    })
   },
   /** 从交换机 ARP 发现终端（虚拟 PC）候选 */
   discoverEndpoints() {
@@ -125,6 +129,9 @@ export const aiopsApi = {
   },
   getScreenBrief() {
     return request.get('/aiops/screen-brief')
+  },
+  getDashboard(force = false) {
+    return request.get('/aiops/dashboard', { params: force ? { force: true } : {} })
   },
   runUnattended(body = {}) {
     return request.post('/aiops/unattended/run', body || {})
@@ -353,6 +360,7 @@ export const configApi = {
       parallel: params.parallel || false,
       reason: params.reason || undefined,
       waveSize: params.waveSize || undefined,
+      variableSets: params.variableSets || undefined,
       approvedRequestId: params.approvedRequestId || undefined
     })
   },
@@ -360,7 +368,8 @@ export const configApi = {
     return request.post('/configs/batch-apply/preview', {
       deviceIds,
       content: params.content,
-      enableVariables: params.enableVariables || false
+      enableVariables: params.enableVariables || false,
+      variableSets: params.variableSets || undefined
     })
   },
   startBatchBackupTask(deviceIds, params = {}) {

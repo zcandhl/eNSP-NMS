@@ -12,6 +12,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -124,12 +125,13 @@ public class DeviceController {
             @RequestParam(required = false) String deviceType,
             @RequestParam(required = false) String monitorMode,
             @RequestParam(required = false) String vendor,
+            @RequestParam(required = false) Long projectId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(defaultValue = "id,asc") String sort) {
         Pageable pageable = buildPageable(page, size, sort);
         return ResponseEntity.ok(deviceService.queryDevices(
-                keyword, status, groupId, deviceType, monitorMode, vendor, pageable));
+                keyword, status, groupId, deviceType, monitorMode, vendor, projectId, pageable));
     }
 
     @SuppressWarnings("unchecked")
@@ -262,7 +264,15 @@ public class DeviceController {
         try {
             Device device = deviceService.getDeviceById(id).orElse(null);
             String name = device != null ? device.getName() : String.valueOf(id);
-            deviceService.deleteDevice(id);
+            try {
+                deviceService.deleteDevice(id);
+            } catch (DataIntegrityViolationException e) {
+                // 采集/告警任务是 30s 一轮且用 findAll() 扫全设备：极端情况下会在"清理子表"与
+                // "删除父记录"之间插入一条新的性能告警，触发外键约束。
+                // 此时首次事务已回滚，重新调用会开启新事务、再清一遍子表，即可成功。
+                log.warn("删除设备 {} 首次失败（子表存在并发写入），重试一次: {}", id, e.getMessage());
+                deviceService.deleteDevice(id);
+            }
             auditDevice("delete", id, name, "success", "删除设备 " + name, authentication);
             return ResponseEntity.ok().build();
         } catch (RuntimeException e) {
@@ -414,7 +424,9 @@ public class DeviceController {
                     candidates.add(c);
                 }
             }
-            List<Device> saved = deviceDiscoveryService.importCandidates(candidates);
+            // 工程上下文：入库设备绑定当前工程（未传/负数 = 未分配）
+            Long projectId = parseLongOrNull(request.get("projectId"));
+            List<Device> saved = deviceDiscoveryService.importCandidates(candidates, projectId);
             auditLogService.record(AuditLogService.AuditRecord.builder()
                     .module("device")
                     .action("discover_import")
@@ -467,6 +479,17 @@ public class DeviceController {
             return Integer.parseInt(String.valueOf(value));
         } catch (NumberFormatException e) {
             return defaultValue;
+        }
+    }
+
+    private Long parseLongOrNull(Object value) {
+        if (value == null || String.valueOf(value).isBlank()) {
+            return null;
+        }
+        try {
+            return Long.parseLong(String.valueOf(value));
+        } catch (NumberFormatException e) {
+            return null;
         }
     }
 

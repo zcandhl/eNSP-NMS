@@ -33,16 +33,35 @@ public class ConnectivityRecoveryService {
     /**
      * 应用一次探测结果并写回设备状态。
      *
-     * @param device   已加载实体（会被更新并 save）
-     * @param reachable 本次是否可达
+     * <p><b>必须传 deviceId 而不是 Device 实体</b>：采集线程在事务外 {@code findAll()} 得到的是
+     * detached 实体，直接 {@code save()} 会走 {@code merge}。若该设备已被删除，merge 会
+     * 把它当成新记录 INSERT 回来（表现为「删了又出现、要删很多次」）；若设备刚被编辑过，
+     * merge 会用旧快照整行覆盖（表现为「改了很多次都不生效」）。所以在事务内按 id 重新加载，
+     * 实体不存在即说明已被删除，直接丢弃本次探测结果。
+     *
+     * @param deviceId   设备主键
+     * @param reachable  本次是否可达
      * @param probeMethod snmp / icmp
      */
     @Transactional
-    public ProbeApplyResult applyProbeResult(Device device, boolean reachable, String probeMethod) {
-        if (device == null || device.getId() == null) {
+    public ProbeApplyResult applyProbeResult(Long deviceId, boolean reachable, String probeMethod) {
+        if (deviceId == null) {
             return ProbeApplyResult.empty();
         }
-        Long id = device.getId();
+        Device device = deviceRepository.findById(deviceId).orElse(null);
+        if (device == null) {
+            // 设备已被删除：清理去抖计数，绝不能用旧实体 merge 复活它
+            successCounts.remove(deviceId);
+            failCounts.remove(deviceId);
+            ProbeApplyResult gone = ProbeApplyResult.empty();
+            gone.setDeviceId(deviceId);
+            gone.setDeleted(true);
+            gone.setReachable(reachable);
+            gone.setMessage("设备已删除，忽略本次探测结果");
+            log.debug("设备 {} 已删除，忽略探测结果", deviceId);
+            return gone;
+        }
+        Long id = deviceId;
         int needOk = Math.max(1, probeProperties.getOnlineAfterSuccesses());
         int needFail = Math.max(1, probeProperties.getOfflineAfterFailures());
         String previous = device.getStatus();
@@ -195,6 +214,7 @@ public class ConnectivityRecoveryService {
         private boolean recoveryConfirmed;
         private boolean suspectedRecovery;
         private boolean statusChanged;
+        private boolean deleted;
         private int alarmsCleared;
         private int alarmsRaised;
         private Long alarmId;
@@ -226,6 +246,7 @@ public class ConnectivityRecoveryService {
             m.put("recoveryConfirmed", recoveryConfirmed);
             m.put("suspectedRecovery", suspectedRecovery);
             m.put("statusChanged", statusChanged);
+            m.put("deleted", deleted);
             m.put("alarmsCleared", alarmsCleared);
             m.put("alarmsRaised", alarmsRaised);
             m.put("alarmId", alarmId);

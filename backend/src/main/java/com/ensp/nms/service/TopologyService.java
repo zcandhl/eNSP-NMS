@@ -31,11 +31,39 @@ public class TopologyService {
             List.of(Alarm.Status.ACTIVE, Alarm.Status.ACKNOWLEDGED);
 
     public Map<String, Object> getFullTopology() {
+        return getFullTopology(null);
+    }
+
+    /**
+     * 全量拓扑，可按工程过滤（projectId 为 null 表示不限；负数表示"未分配工程"）。
+     *
+     * 设备按所属工程筛；链路两端都必须在筛后设备集合内才保留，
+     * 避免跨工程链路把别的工程的设备"拉"回视图里。
+     */
+    public Map<String, Object> getFullTopology(Long projectId) {
         Map<String, Object> result = new HashMap<>();
-        
+
         List<Device> devices = deviceRepository.findAll();
+        if (projectId != null) {
+            devices = devices.stream()
+                    .filter(d -> matchProject(d.getProjectId(), projectId))
+                    .collect(Collectors.toList());
+        }
+        Set<Long> scopedDeviceIds = devices.stream()
+                .map(Device::getId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        boolean scoped = projectId != null;
+
         List<TopologyNode> topologyNodes = topologyNodeRepository.findAll();
         List<TopologyLink> topologyLinks = topologyLinkRepository.findAll();
+        if (scoped) {
+            topologyLinks = topologyLinks.stream()
+                    .filter(l -> l.getSourceNodeId() != null && l.getTargetNodeId() != null)
+                    .filter(l -> scopedDeviceIds.contains(l.getSourceNodeId())
+                            && scopedDeviceIds.contains(l.getTargetNodeId()))
+                    .collect(Collectors.toList());
+        }
         
         // 同一 device_id 若有多条位置记录（优化误写造成），保留最新一条，避免 toMap 抛错拖垮拓扑接口
         Map<Long, TopologyNode> nodeMap = topologyNodes.stream()
@@ -95,8 +123,17 @@ public class TopologyService {
         result.put("nodes", nodes);
         result.put("links", links);
         result.put("alertSummary", alertSummary);
-        
+        result.put("projectId", projectId);
+        result.put("linkCount", links.size());
+
         return result;
+    }
+
+    /** 工程过滤规则：null 不限；负数 = 未分配工程（project_id IS NULL） */
+    private static boolean matchProject(Long deviceProjectId, Long projectId) {
+        if (projectId == null) return true;
+        if (projectId < 0) return deviceProjectId == null;
+        return projectId.equals(deviceProjectId);
     }
 
     private Map<String, Object> buildAlertSummary(List<Device> devices) {

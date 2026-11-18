@@ -5,6 +5,7 @@ import com.ensp.nms.entity.DevicePort;
 import com.ensp.nms.entity.TopologyLink;
 import com.ensp.nms.entity.TopologyNode;
 import com.ensp.nms.repository.AlarmRepository;
+import com.ensp.nms.repository.AiopsUnattendedRunRepository;
 import com.ensp.nms.repository.BackupScheduleRepository;
 import com.ensp.nms.repository.ConfigChangeLogRepository;
 import com.ensp.nms.repository.DeviceConfigRepository;
@@ -60,7 +61,9 @@ public class DeviceService {
     private final ConfigChangeLogRepository configChangeLogRepository;
     private final PerformanceAlertRepository performanceAlertRepository;
     private final AlarmRepository alarmRepository;
+    private final AiopsUnattendedRunRepository aiopsUnattendedRunRepository;
     private final ConnectivityRecoveryService connectivityRecoveryService;
+    private final org.springframework.transaction.support.TransactionTemplate transactionTemplate;
 
     public List<Device> getAllDevices() {
         List<Device> devices = deviceRepository.findAll();
@@ -68,12 +71,22 @@ public class DeviceService {
         return devices;
     }
 
+    /** 按工程取设备（全局工程上下文用）；projectId 为空返回全部 */
+    public List<Device> getAllDevices(Long projectId) {
+        List<Device> devices = projectId == null
+                ? deviceRepository.findAll()
+                : deviceRepository.findByProjectId(projectId);
+        devices.forEach(deviceCapabilityService::enrich);
+        return devices;
+    }
+
     public Page<Device> queryDevices(String keyword, String status, Long groupId, Pageable pageable) {
-        return queryDevices(keyword, status, groupId, null, null, null, pageable);
+        return queryDevices(keyword, status, groupId, null, null, null, null, pageable);
     }
 
     public Page<Device> queryDevices(String keyword, String status, Long groupId,
                                      String deviceType, String monitorMode, String vendor,
+                                     Long projectId,
                                      Pageable pageable) {
         Specification<Device> spec = (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
@@ -98,6 +111,14 @@ public class DeviceService {
                     predicates.add(cb.isNull(root.get("groupId")));
                 } else {
                     predicates.add(cb.equal(root.get("groupId"), groupId));
+                }
+            }
+            if (projectId != null) {
+                // 与 groupId 同约定：-1 表示"未分配工程"
+                if (projectId < 0) {
+                    predicates.add(cb.isNull(root.get("projectId")));
+                } else {
+                    predicates.add(cb.equal(root.get("projectId"), projectId));
                 }
             }
             if (deviceType != null && !deviceType.isBlank() && !"all".equalsIgnoreCase(deviceType)) {
@@ -173,21 +194,36 @@ public class DeviceService {
         return result;
     }
 
-    @Transactional
+    /**
+     * 批量删除：每台设备单独一个事务。
+     * 原来整个方法一个事务，某台撞外键后事务被标记 rollback-only，
+     * 后续删除与最终提交都会失败（表现为"批量删一半、报 UnexpectedRollback"）。
+     */
     public Map<String, Object> batchDelete(List<Long> ids) {
         List<Long> safe = normalizeIds(ids);
         int success = 0;
         int failed = 0;
         for (Long id : safe) {
             try {
-                deleteDevice(id);
+                deleteInOwnTransaction(id);
                 success++;
             } catch (Exception e) {
-                failed++;
-                log.warn("批量删除设备失败 id={}: {}", id, e.getMessage());
+                // 采集/告警任务 30s 一轮，可能在清理子表与删父记录之间写入新记录：
+                // 首次失败后新事务重试一次通常即可成功
+                try {
+                    deleteInOwnTransaction(id);
+                    success++;
+                } catch (Exception retry) {
+                    failed++;
+                    log.warn("批量删除设备失败 id={}: {}", id, retry.getMessage());
+                }
             }
         }
         return Map.of("requested", safe.size(), "success", success, "failed", failed);
+    }
+
+    private void deleteInOwnTransaction(Long id) {
+        transactionTemplate.executeWithoutResult(status -> deleteDevice(id));
     }
 
     @Transactional
@@ -310,6 +346,10 @@ public class DeviceService {
         if (deviceDetails.getSshPort() != null) {
             device.setSshPort(deviceDetails.getSshPort());
         }
+        if (deviceDetails.getManagementProtocol() != null
+                && !deviceDetails.getManagementProtocol().isBlank()) {
+            device.setManagementProtocol(deviceDetails.getManagementProtocol().trim().toLowerCase());
+        }
         if (deviceDetails.getDescription() != null) {
             device.setDescription(deviceDetails.getDescription());
         }
@@ -340,31 +380,49 @@ public class DeviceService {
 
     @Transactional
     public void deleteDevice(Long id) {
-        if (!deviceRepository.existsById(id)) {
-            throw new RuntimeException("Device not found");
+        Device device = deviceRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Device not found"));
+
+        // ① 先置离线并 flush：采集/巡检线程按 online 过滤设备，避免删到一半又从监控侧写入性能告警
+        if (!"offline".equalsIgnoreCase(device.getStatus())) {
+            device.setStatus("offline");
+            deviceRepository.saveAndFlush(device);
         }
 
-        // 拓扑：链路端点存的是 device_id，与 topology_node.id 无关
-        List<TopologyLink> links = topologyLinkRepository.findBySourceNodeIdOrTargetNodeId(id, id);
-        if (!links.isEmpty()) {
-            topologyLinkRepository.deleteAll(links);
-        }
-        List<TopologyNode> nodes = topologyNodeRepository.findAllByDeviceId(id);
-        if (!nodes.isEmpty()) {
-            topologyNodeRepository.deleteAll(nodes);
-        }
+        // ② 清理所有引用 device 的子表（全部 bulk delete，立即执行 SQL）
+        purgeDeviceReferences(id, device.getIpAddress());
 
-        devicePortRepository.deleteByDeviceId(id);
-        deviceConfigRepository.deleteByDeviceId(id);
-        backupScheduleRepository.deleteByDeviceId(id);
-        configChangeLogRepository.deleteByDeviceId(id);
-        performanceAlertRepository.deleteByDeviceId(id);
-        performanceDataRepository.deleteByDeviceId(id);
-        deviceIpAliasRepository.deleteByDeviceId(id);
-        alarmRepository.clearDeviceReference(id);
-
+        // ③ 删除父记录
         deviceRepository.deleteById(id);
+        deviceRepository.flush();
         log.info("已级联删除设备及相关数据: deviceId={}", id);
+    }
+
+    /**
+     * 清理 device 的所有子表引用。
+     * 关键点：每个方法都是 @Modifying bulk delete，SQL 立即下发，
+     * 不依赖 Hibernate 提交前的 flush 顺序（原派生 deleteByDeviceId 会先 select 再 remove，
+     * 删除动作滞留到 flush，父表先删就会报 FK 约束失败）。
+     */
+    private void purgeDeviceReferences(Long id, String deviceIp) {
+        topologyLinkRepository.deleteAllByEndpoint(id);
+        topologyNodeRepository.deleteAllByDeviceId(id);
+        devicePortRepository.deleteAllByDeviceId(id);
+        deviceConfigRepository.deleteAllByDeviceId(id);
+        backupScheduleRepository.deleteAllByDeviceId(id);
+        configChangeLogRepository.deleteAllByDeviceId(id);
+        performanceAlertRepository.deleteAllByDeviceId(id);
+        performanceDataRepository.deleteByDeviceId(id);
+        deviceIpAliasRepository.deleteAllByDeviceId(id);
+        aiopsUnattendedRunRepository.detachDevice(id);
+        // 告警随设备一起删除（而不是置空外键）：设备已不存在，告警既无处置对象，
+        // 又会继续计入告警中心/AIOps 的「活动告警」「今日告警」「按设备 TopN」，导致数字不归零。
+        int deleted = alarmRepository.deleteByDeviceIdHard(id);
+        if (deviceIp != null && !deviceIp.isBlank()) {
+            // 兜底：Trap 先于设备登记到达、device_id 为空但 device_ip 相等的孤儿告警
+            deleted += alarmRepository.deleteOrphanByDeviceIp(deviceIp);
+        }
+        log.info("清理设备 {} 的告警 {} 条", id, deleted);
     }
 
     @Transactional
@@ -414,7 +472,7 @@ public class DeviceService {
 
         // 去抖落库：连续成功才 online+CLEAR，连续失败才 offline
         ConnectivityRecoveryService.ProbeApplyResult probeResult =
-                connectivityRecoveryService.applyProbeResult(device, reachable, probe);
+                connectivityRecoveryService.applyProbeResult(id, reachable, probe);
         Device saved = deviceRepository.findById(id).orElse(device);
         if (reachable && "snmp".equals(probe) && probeResult.isOnline()) {
             try {
@@ -515,21 +573,26 @@ public class DeviceService {
                     || device.getSshPassword() == null || device.getSshPassword().isBlank()) {
                 ssh.put("ok", false);
                 ssh.put("skipped", true);
-                ssh.put("reason", "未配置 SSH 用户名或密码");
+                ssh.put("reason", "未配置远程管理账号或密码");
             } else {
-                int port = device.getSshPort() != null ? device.getSshPort() : 22;
+                // AC 走 telnet，其余走 SSH；端口按协议取默认值兜底
+                String protocol = device.isTelnetManagement()
+                        ? SshClient.PROTOCOL_TELNET : SshClient.PROTOCOL_SSH;
+                int port = device.getSshPort() != null && device.getSshPort() > 0
+                        ? device.getSshPort() : SshClient.defaultPort(protocol);
                 long t0 = System.currentTimeMillis();
                 boolean ok = false;
                 String err = null;
                 try {
                     ok = sshClient.testConnection(ip, port, device.getSshUsername(),
-                            device.getSshPassword());
+                            device.getSshPassword(), protocol);
                 } catch (Exception e) {
                     err = e.getMessage();
                 }
                 ssh.put("ok", ok);
                 ssh.put("latencyMs", System.currentTimeMillis() - t0);
                 ssh.put("port", port);
+                ssh.put("protocol", protocol);
                 ssh.put("username", device.getSshUsername());
                 if (err != null) ssh.put("error", err);
             }
@@ -556,7 +619,7 @@ public class DeviceService {
     public List<Device> listForExport(String keyword, String status, Long groupId,
                                       String deviceType, String monitorMode, String vendor) {
         Pageable pageable = PageRequest.of(0, 5000, Sort.by(Sort.Direction.ASC, "id"));
-        return queryDevices(keyword, status, groupId, deviceType, monitorMode, vendor, pageable).getContent();
+        return queryDevices(keyword, status, groupId, deviceType, monitorMode, vendor, null, pageable).getContent();
     }
 
     /**

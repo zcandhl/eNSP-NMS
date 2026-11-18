@@ -1,5 +1,6 @@
 package com.ensp.nms.service;
 
+import com.ensp.nms.device.DeviceType;
 import com.ensp.nms.dto.ConfigHealthOverview;
 import com.ensp.nms.dto.DeviceBackupHealth;
 import com.ensp.nms.dto.DeviceBackupLatestView;
@@ -14,8 +15,10 @@ import com.ensp.nms.repository.DeviceConfigRepository;
 import com.ensp.nms.repository.DeviceRepository;
 import com.ensp.nms.security.SecurityUtils;
 import com.ensp.nms.ssh.SshClient;
+import com.ensp.nms.ssh.SshConnectException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -46,6 +49,16 @@ public class DeviceConfigService {
     private final SshClient sshClient;
     private final ConfigChangeLogService configChangeLogService;
     private final AuditLogService auditLogService;
+
+    /**
+     * 连接类失败的重试次数。AC6005 这类设备在 eNSP 里会间歇性重启/卡顿，
+     * 单次失败不代表设备真的不可用；重试能把「抖动」挡在用户感知之外。
+     */
+    @Value("${nms.ssh.config-retry-attempts:3}")
+    private int configRetryAttempts = 3;
+
+    @Value("${nms.ssh.config-retry-delay-ms:2500}")
+    private long configRetryDelayMs = 2500;
 
     public List<DeviceConfigSummary> getConfigSummariesByDeviceId(Long deviceId) {
         return deviceConfigRepository.findByDeviceIdOrderByCreatedAtDesc(deviceId).stream()
@@ -157,28 +170,50 @@ public class DeviceConfigService {
     public String pullLiveConfig(Long deviceId, String configType) throws Exception {
         Device device = deviceRepository.findById(deviceId)
                 .orElseThrow(() -> new RuntimeException("Device not found"));
-        if (device.getSshUsername() == null || device.getSshPassword() == null) {
-            throw new RuntimeException("SSH credentials not configured for device");
-        }
+        requireCredentials(device);
         boolean startup = "startup".equalsIgnoreCase(configType);
-        int port = device.getSshPort() != null ? device.getSshPort() : 22;
         return sshClient.getHuaweiConfig(
-                device.getIpAddress(), port, device.getSshUsername(), device.getSshPassword(), startup);
+                device.getIpAddress(), managementPort(device), device.getSshUsername(), device.getSshPassword(),
+                startup, protocolOf(device));
     }
 
     /**
      * 受控只读 show：白名单命令，禁止进入 system-view / 改配。
+     * 走 executeDisplayCommand 只读查询专用通道（自动关分页、截去回显噪声），
+     * 不经过配置命令过滤器（该过滤器会误删 display 行，曾导致巡检"成功: 0, 失败: 0"）。
      */
     public String runReadOnlyShow(Long deviceId, String command) throws Exception {
         String cmd = normalizeShowCommand(command);
         Device device = deviceRepository.findById(deviceId)
                 .orElseThrow(() -> new RuntimeException("Device not found"));
-        if (device.getSshUsername() == null || device.getSshPassword() == null) {
-            throw new RuntimeException("SSH credentials not configured for device");
+        requireCredentials(device);
+        return sshClient.executeDisplayCommand(
+                device.getIpAddress(), managementPort(device), device.getSshUsername(), device.getSshPassword(),
+                cmd, protocolOf(device));
+    }
+
+    /** 统一校验远程管理账号，报错里带上设备名与当前协议，便于现场定位 */
+    private void requireCredentials(Device device) {
+        if (device.getSshUsername() == null || device.getSshUsername().isBlank()
+                || device.getSshPassword() == null || device.getSshPassword().isBlank()) {
+            throw new RuntimeException("设备【" + device.getName() + "】未配置"
+                    + (device.isTelnetManagement() ? " Telnet " : " SSH ") + "用户名/密码，无法执行该操作");
         }
-        int port = device.getSshPort() != null ? device.getSshPort() : 22;
-        return sshClient.executeCommand(
-                device.getIpAddress(), port, device.getSshUsername(), device.getSshPassword(), cmd);
+    }
+
+    /** 设备当前使用的远程管理协议：ssh（默认）/ telnet */
+    public static String protocolOf(Device device) {
+        return device != null && device.isTelnetManagement()
+                ? SshClient.PROTOCOL_TELNET : SshClient.PROTOCOL_SSH;
+    }
+
+    /** 管理端口：优先用设备上配的端口，未配则按协议取默认值（SSH 22 / Telnet 23） */
+    public static int managementPort(Device device) {
+        Integer configured = device != null ? device.getSshPort() : null;
+        if (configured != null && configured > 0) {
+            return configured;
+        }
+        return SshClient.defaultPort(protocolOf(device));
     }
 
     public static String normalizeShowCommand(String command) {
@@ -240,19 +275,20 @@ public class DeviceConfigService {
         Device device = deviceRepository.findById(deviceId)
                 .orElseThrow(() -> new RuntimeException("Device not found"));
 
-        if (device.getSshUsername() == null || device.getSshPassword() == null) {
-            throw new RuntimeException("SSH credentials not configured for device");
-        }
+        // AC6005 在 eNSP 中 SSH 服务异常（KEXINIT 后无响应），该类设备已切换为 telnet 管理，
+        // 因此不再对 AC 做特殊跳过处理，交由 managementProtocol 决定通道。
+        requireCredentials(device);
 
         boolean isStartup = "startup".equalsIgnoreCase(configType);
-        int port = device.getSshPort() != null ? device.getSshPort() : 22;
-        String configContent = sshClient.getHuaweiConfig(
-                device.getIpAddress(),
-                port,
-                device.getSshUsername(),
-                device.getSshPassword(),
-                isStartup
-        );
+        // AC6005（telnet 管理）镜像不响应 display saved-configuration（实测回显命令后直接回到
+        // 提示符），配置文件 sdcard:/vrpcfg.zip 又是 zip 二进制无法直接读取。对这类设备，
+        // startup 备份自动以 running 配置代替，并在描述里如实标注，避免演示时报错。
+        boolean startupDowngradedToRunning = false;
+        if (isStartup && device.isTelnetManagement()) {
+            isStartup = false;
+            startupDowngradedToRunning = true;
+        }
+        String configContent = fetchConfigWithRetry(device, isStartup);
 
         DeviceConfig config = new DeviceConfig();
         config.setDeviceId(deviceId);
@@ -263,6 +299,10 @@ public class DeviceConfigService {
             config.setDescription(description.trim());
         } else {
             config.setDescription("Auto backup at " + LocalDateTime.now());
+        }
+        if (startupDowngradedToRunning) {
+            config.setDescription("【自动降级】该设备（AC6005）镜像不支持读取启动配置，"
+                    + "本记录内容实为当前运行配置（running）。" + config.getDescription());
         }
         String operator = createdBy != null && !createdBy.isBlank() ? createdBy : "system";
         config.setCreatedBy(operator);
@@ -286,6 +326,54 @@ public class DeviceConfigService {
         }
         enforceRetention(deviceId);
         return saved;
+    }
+
+    /**
+     * 取配置，带连接类重试。
+     * <p>只重试「握手超时 / 读不到内容 / 连接被重置」这类瞬时故障；认证失败、端口不通
+     * 属于确定性问题，立即抛出，避免把明确错误拖成几十秒等待。</p>
+     */
+    private String fetchConfigWithRetry(Device device, boolean startup) {
+        int attempts = Math.max(1, configRetryAttempts);
+        SshConnectException last = null;
+        for (int i = 1; i <= attempts; i++) {
+            try {
+                return sshClient.getHuaweiConfig(device.getIpAddress(), managementPort(device),
+                        device.getSshUsername(), device.getSshPassword(), startup, protocolOf(device));
+            } catch (SshConnectException e) {
+                last = e;
+                if (!isTransient(e) || i >= attempts) {
+                    break;
+                }
+                log.warn("设备【{}】第 {}/{} 次读取配置失败，{}ms 后重试：{}",
+                        device.getName(), i, attempts, configRetryDelayMs, e.getMessage());
+                sleepQuietly(configRetryDelayMs);
+            } catch (Exception e) {
+                throw new RuntimeException("设备【" + device.getName() + "】" + SshClient.explain(e), e);
+            }
+        }
+        String reason = last != null ? last.getMessage() : "未知原因";
+        if (attempts > 1 && last != null && isTransient(last)) {
+            reason = reason + "（已重试 " + attempts + " 次）";
+        }
+        throw new RuntimeException("设备【" + device.getName() + "】" + reason, last);
+    }
+
+    /** 瞬时故障才值得重试；认证失败、端口不通重试也没用 */
+    private boolean isTransient(SshConnectException e) {
+        String m = e.getMessage() == null ? "" : e.getMessage();
+        // 「Read timed out」「timed out」是 socket 读超时的英文原文（SocketTimeoutException），
+        // AC6005 telnet 会话建立阶段会随机出现，必须纳入重试范围
+        return m.contains("协商超时") || m.contains("读取配置失败") || m.contains("连接被设备重置")
+                || m.toLowerCase().contains("timed out") || m.contains("超时");
+    }
+
+    private void sleepQuietly(long ms) {
+        try {
+            Thread.sleep(ms);
+        } catch (InterruptedException ie) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     /** 每设备最多保留份数，超出删除最旧备份 */
@@ -395,12 +483,12 @@ public class DeviceConfigService {
             return false;
         }
 
-        int port = device.getSshPort() != null ? device.getSshPort() : 22;
         return sshClient.testConnection(
                 device.getIpAddress(),
-                port,
+                managementPort(device),
                 device.getSshUsername(),
-                device.getSshPassword()
+                device.getSshPassword(),
+                protocolOf(device)
         );
     }
 
@@ -449,11 +537,11 @@ public class DeviceConfigService {
             preBackupVersion = snapshot.getConfigVersion();
         }
 
-        int port = device.getSshPort() != null ? device.getSshPort() : 22;
+        int port = managementPort(device);
         List<String> lines = SshClient.prepareRestoreCommands(config.getContent());
         SshClient.CommandBatchResult batch = sshClient.executeConfigCommands(
                 device.getIpAddress(), port, device.getSshUsername(), device.getSshPassword(),
-                lines, "恢复配置", progress
+                lines, "恢复配置", progress, protocolOf(device)
         );
 
         ConfigChangeLog changeLog = configChangeLogService.record(
@@ -570,15 +658,13 @@ public class DeviceConfigService {
         Device device = deviceRepository.findById(deviceId)
                 .orElseThrow(() -> new RuntimeException("Device not found"));
 
-        if (device.getSshUsername() == null || device.getSshPassword() == null) {
-            throw new RuntimeException("SSH credentials not configured");
-        }
+        requireCredentials(device);
 
-        int port = device.getSshPort() != null ? device.getSshPort() : 22;
+        int port = managementPort(device);
         List<String> lines = Arrays.asList(templateContent != null ? templateContent.split("\n") : new String[0]);
         SshClient.CommandBatchResult batch = sshClient.executeConfigCommands(
                 device.getIpAddress(), port, device.getSshUsername(), device.getSshPassword(),
-                lines, "应用配置"
+                lines, "应用配置", null, protocolOf(device)
         );
 
         String operator = SecurityUtils.currentOperator();
@@ -673,6 +759,17 @@ public class DeviceConfigService {
     private Map<String, Object> processDeviceConfig(Long deviceId, String templateContent,
                                                     boolean enableVariables, int index, String operator,
                                                     String reason) {
+        return processDeviceConfig(deviceId, templateContent, enableVariables, index, operator, reason, null, null);
+    }
+
+    /**
+     * @param extraVars    变量集自定义变量（可 null）；非 null 时无论 enableVariables 均执行变量替换
+     * @param segmentIndex 变量集段号（1 起），仅用于结果行标注，可 null
+     */
+    private Map<String, Object> processDeviceConfig(Long deviceId, String templateContent,
+                                                    boolean enableVariables, int index, String operator,
+                                                    String reason, Map<String, String> extraVars,
+                                                    Integer segmentIndex) {
         Map<String, Object> deviceResult = new HashMap<>();
         try {
             Device device = deviceRepository.findById(deviceId).orElse(null);
@@ -684,15 +781,15 @@ public class DeviceConfigService {
             }
 
             String content = templateContent;
-            if (enableVariables) {
-                content = replaceVariables(content, device, index);
+            if (enableVariables || extraVars != null) {
+                content = replaceVariables(content, device, index, extraVars);
             }
 
-            int port = device.getSshPort() != null ? device.getSshPort() : 22;
+            int port = managementPort(device);
             List<String> lines = Arrays.asList(content != null ? content.split("\n") : new String[0]);
             SshClient.CommandBatchResult batch = sshClient.executeConfigCommands(
                     device.getIpAddress(), port, device.getSshUsername(), device.getSshPassword(),
-                    lines, "批量下发"
+                    lines, "批量下发", null, protocolOf(device)
             );
 
             configChangeLogService.record(
@@ -712,6 +809,12 @@ public class DeviceConfigService {
             deviceResult.put("deviceName", device.getName());
             deviceResult.put("success", batch.ok());
             deviceResult.put("result", batch.summary());
+            if (segmentIndex != null) {
+                deviceResult.put("segmentIndex", segmentIndex);
+            }
+            if (extraVars != null) {
+                deviceResult.put("variables", extraVars);
+            }
             if (!batch.ok()) {
                 deviceResult.put("message", "部分或全部命令执行失败");
             }
@@ -817,6 +920,113 @@ public class DeviceConfigService {
         return out;
     }
 
+    /**
+     * 变量集批量下发：每组变量渲染出一段独立配置（支持 ${room} 等自定义占位符），
+     * 段 × 设备 逐对下发——同一台设备可接收多段不同配置（如 13 个机房段 → 2 台核心）。
+     * 复用 processDeviceConfig：分波/审计/变更记录全部继承。
+     */
+    public Map<String, Object> batchApplyVariableSets(List<Long> deviceIds, String templateContent,
+                                                      List<Map<String, String>> variableSets, boolean parallel,
+                                                      java.util.function.BiConsumer<Integer, Integer> deviceProgress,
+                                                      String reason) {
+        List<Map<String, String>> sets = variableSets != null ? variableSets : List.of();
+        int totalPairs = Math.max(sets.size() * Math.max(deviceIds != null ? deviceIds.size() : 0, 1), 1);
+        Map<String, Object> results = new HashMap<>();
+        List<Map<String, Object>> allResults = new ArrayList<>();
+        String operator = SecurityUtils.currentOperator();
+        String reasonText = (reason != null && !reason.isBlank()) ? reason.trim() : "变量集批量下发";
+        int done = 0;
+        int segment = 1;
+        for (Map<String, String> vars : sets) {
+            final int seg = segment++;
+            final Map<String, String> varSet = vars == null ? Map.of() : vars;
+            if (parallel && deviceIds != null && deviceIds.size() > 1) {
+                java.util.concurrent.ExecutorService executor =
+                        java.util.concurrent.Executors.newFixedThreadPool(Math.min(deviceIds.size(), 2));
+                java.util.List<java.util.concurrent.Future<Map<String, Object>>> futures = new java.util.ArrayList<>();
+                for (Long deviceId : deviceIds) {
+                    futures.add(executor.submit(() ->
+                            processDeviceConfig(deviceId, templateContent, true, seg, operator, reasonText, varSet, seg)));
+                }
+                for (java.util.concurrent.Future<Map<String, Object>> future : futures) {
+                    try {
+                        allResults.add(future.get());
+                    } catch (Exception e) {
+                        log.error("变量集批量下发子任务失败", e);
+                    }
+                    done++;
+                    if (deviceProgress != null) {
+                        deviceProgress.accept(done, totalPairs);
+                    }
+                }
+                executor.shutdown();
+            } else {
+                if (deviceIds == null) continue;
+                for (Long deviceId : deviceIds) {
+                    allResults.add(processDeviceConfig(deviceId, templateContent, true, seg, operator, reasonText, varSet, seg));
+                    done++;
+                    if (deviceProgress != null) {
+                        deviceProgress.accept(done, totalPairs);
+                    }
+                }
+            }
+        }
+        results.put("results", allResults);
+        long successCount = allResults.stream().filter(r -> Boolean.TRUE.equals(r.get("success"))).count();
+        results.put("successCount", successCount);
+        results.put("totalCount", allResults.size());
+        results.put("variableSetCount", sets.size());
+        return results;
+    }
+
+    /**
+     * 变量集下发预检（轻量）：只做本地渲染，不拉设备 running、不建 SSH 连接。
+     * 每段返回变量表、命令行数、渲染预览与未替换占位符计数。
+     */
+    public Map<String, Object> previewBatchVariableSets(List<Long> deviceIds, String templateContent,
+                                                        List<Map<String, String>> variableSets) {
+        Map<String, Object> out = new LinkedHashMap<>();
+        List<Map<String, String>> sets = variableSets != null ? variableSets : List.of();
+        List<Map<String, Object>> segments = new ArrayList<>();
+        int segNo = 1;
+        for (Map<String, String> vars : sets) {
+            String rendered = templateContent == null ? "" : templateContent;
+            if (vars != null) {
+                for (Map.Entry<String, String> e : vars.entrySet()) {
+                    if (e.getKey() == null || e.getKey().isBlank()) {
+                        continue;
+                    }
+                    rendered = rendered.replace("${" + e.getKey().trim() + "}", e.getValue() == null ? "" : e.getValue());
+                }
+            }
+            List<String> planned = Arrays.stream(rendered.split("\n"))
+                    .map(String::trim)
+                    .filter(s -> !s.isEmpty() && !s.startsWith("#") && !s.startsWith("!"))
+                    .toList();
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("segmentIndex", segNo);
+            row.put("variables", vars);
+            row.put("commandCount", planned.size());
+            row.put("commandsPreview", String.join("\n", planned.size() > 40 ? planned.subList(0, 40) : planned)
+                    + (planned.size() > 40 ? "\n...(" + (planned.size() - 40) + " more)" : ""));
+            long leftover = planned.stream().filter(s -> s.contains("${")).count();
+            row.put("unresolvedPlaceholders", leftover);
+            segments.add(row);
+            segNo++;
+        }
+        int deviceCount = deviceIds != null ? deviceIds.size() : 0;
+        out.put("segments", segments);
+        out.put("segmentCount", segments.size());
+        out.put("deviceCount", deviceCount);
+        long unresolvedSegs = segments.stream()
+                .filter(s -> s.get("unresolvedPlaceholders") instanceof Number n && n.intValue() > 0)
+                .count();
+        out.put("message", "变量集渲染完成：" + segments.size() + " 段 × " + deviceCount
+                + " 台 = " + (segments.size() * deviceCount) + " 次下发"
+                + (unresolvedSegs > 0 ? "；警告：" + unresolvedSegs + " 段存在未替换占位符" : ""));
+        return out;
+    }
+
     private String replaceVariables(String content, Device device, int index) {
         return content
                 .replace("${deviceId}", String.valueOf(device.getId()))
@@ -824,6 +1034,20 @@ public class DeviceConfigService {
                 .replace("${ipAddress}", device.getIpAddress())
                 .replace("${model}", device.getModel() != null ? device.getModel() : "")
                 .replace("${index}", String.valueOf(index));
+    }
+
+    /** 在内置变量基础上追加变量集自定义变量（${room} 等），值为 null 时替换为空串 */
+    private String replaceVariables(String content, Device device, int index, Map<String, String> extraVars) {
+        String out = replaceVariables(content, device, index);
+        if (extraVars != null) {
+            for (Map.Entry<String, String> e : extraVars.entrySet()) {
+                if (e.getKey() == null || e.getKey().isBlank()) {
+                    continue;
+                }
+                out = out.replace("${" + e.getKey().trim() + "}", e.getValue() == null ? "" : e.getValue());
+            }
+        }
+        return out;
     }
 
     private static String truncate(String s, int max) {

@@ -52,6 +52,7 @@ public class AiopsService {
     private final AlarmService alarmService;
     private final LlmUnattendedOpsService unattendedOpsService;
     private final LlmSettingsService llmSettingsService;
+    private final com.ensp.nms.repository.PerformanceDataRepository performanceDataRepository;
 
     /** 最近一次巡检结构化证据（工作台/大屏展示） */
     private volatile Map<String, Object> lastInspectEvidence = Map.of();
@@ -212,8 +213,209 @@ public class AiopsService {
         return m;
     }
 
-    public Map<String, Object> runUnattendedCycle() {
-        return unattendedOpsService.runCycle("api");
+    private volatile Map<String, Object> cachedDashboard = null;
+    private volatile LocalDateTime lastDashboardAt = null;
+    private static final int DASHBOARD_TTL_SECONDS = 15;
+
+    /**
+     * 智能大屏数据看板：全部来自真实库表（设备/告警/性能/AIOps 处置），
+     * 不做任何模拟数据。短缓存 15s，避免大屏 30s 轮询把库打满。
+     */
+    @Transactional(readOnly = true)
+    public Map<String, Object> dashboard(boolean forceRefresh) {
+        if (!forceRefresh && cachedDashboard != null && lastDashboardAt != null
+                && ChronoUnit.SECONDS.between(lastDashboardAt, LocalDateTime.now()) < DASHBOARD_TTL_SECONDS) {
+            Map<String, Object> hit = new LinkedHashMap<>(cachedDashboard);
+            hit.put("cached", true);
+            return hit;
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        Map<String, Object> m = new LinkedHashMap<>();
+        List<Device> devices = deviceRepository.findAll();
+
+        // ---------- 设备态势 ----------
+        long online = devices.stream().filter(d -> "online".equalsIgnoreCase(d.getStatus())).count();
+        long offline = devices.stream().filter(d -> "offline".equalsIgnoreCase(d.getStatus())).count();
+        long unknown = devices.size() - online - offline;
+
+        // ---------- 告警态势 ----------
+        List<Alarm.Status> openStatuses = List.of(Alarm.Status.ACTIVE, Alarm.Status.ACKNOWLEDGED);
+        long activeAlarms = alarmRepository.countByStatusIn(openStatuses);
+        long criticalAlarms = alarmRepository.countByStatusAndSeverity(Alarm.Status.ACTIVE, Alarm.Severity.CRITICAL);
+        long todayAlarms = alarmRepository.countByOccurredAtBetween(now.toLocalDate().atStartOfDay(), now);
+        long weekAlarms = alarmRepository.countByOccurredAtBetween(now.minusDays(7), now);
+
+        Map<String, Object> health = healthScoreService.compute();
+        int healthScore = health.get("networkScore") instanceof Number n ? n.intValue() : 0;
+
+        Map<String, Object> unattended = unattendedOpsService.status();
+
+        Map<String, Object> summary = new LinkedHashMap<>();
+        summary.put("deviceTotal", devices.size());
+        summary.put("deviceOnline", online);
+        summary.put("deviceOffline", offline);
+        summary.put("deviceUnknown", unknown);
+        summary.put("alarmActive", activeAlarms);
+        summary.put("alarmCritical", criticalAlarms);
+        summary.put("alarmToday", todayAlarms);
+        summary.put("alarmWeek", weekAlarms);
+        summary.put("healthScore", healthScore);
+        summary.put("healthGrade", healthGrade(healthScore));
+        summary.put("autoHandled24h", unattended.getOrDefault("last24hTotal", 0));
+        summary.put("autoSuccessRate", unattended.getOrDefault("last24hSuccessRate", null));
+        summary.put("llmOpsMode", policyProperties.getLlmOpsMode());
+        m.put("summary", summary);
+
+        // ---------- 告警级别分布（活动告警） ----------
+        Map<String, Long> severityCounts = new LinkedHashMap<>();
+        for (Object[] row : alarmRepository.countGroupBySeverityInStatus(openStatuses)) {
+            if (row[0] != null) severityCounts.put(row[0].toString(), ((Number) row[1]).longValue());
+        }
+        List<Map<String, Object>> severityDist = new ArrayList<>();
+        severityDist.add(severityItem("CRITICAL", "紧急", severityCounts));
+        severityDist.add(severityItem("MAJOR", "重要", severityCounts));
+        severityDist.add(severityItem("WARNING", "警告", severityCounts));
+        severityDist.add(severityItem("MINOR", "次要", severityCounts));
+        severityDist.add(severityItem("INFO", "提示", severityCounts));
+        m.put("severityDist", severityDist);
+
+        // ---------- 设备状态分布 ----------
+        List<Map<String, Object>> statusDist = new ArrayList<>();
+        statusDist.add(Map.of("name", "在线", "value", online));
+        statusDist.add(Map.of("name", "离线", "value", offline));
+        if (unknown > 0) statusDist.add(Map.of("name", "未知", "value", unknown));
+        m.put("statusDist", statusDist);
+
+        // ---------- 24h 告警趋势 ----------
+        LocalDateTime trendStart = now.minusHours(23).withMinute(0).withSecond(0).withNano(0);
+        Map<String, Long> hourly = new java.util.HashMap<>();
+        for (Object[] row : alarmRepository.countGroupByHourSince(trendStart)) {
+            if (row == null || row.length < 5 || row[0] == null) continue;
+            String key = LocalDateTime.of(
+                    ((Number) row[0]).intValue(), ((Number) row[1]).intValue(), ((Number) row[2]).intValue(),
+                    ((Number) row[3]).intValue(), 0).toString();
+            hourly.put(key, ((Number) row[4]).longValue());
+        }
+        List<String> trendLabels = new ArrayList<>();
+        List<Long> trendValues = new ArrayList<>();
+        for (int i = 0; i < 24; i++) {
+            LocalDateTime slot = trendStart.plusHours(i);
+            trendLabels.add(String.format("%02d:00", slot.getHour()));
+            trendValues.add(hourly.getOrDefault(slot.toString(), 0L));
+        }
+        Map<String, Object> trend = new LinkedHashMap<>();
+        trend.put("labels", trendLabels);
+        trend.put("values", trendValues);
+        m.put("alarmTrend", trend);
+
+        // ---------- 告警类型 TopN（近 7 天） ----------
+        List<Map<String, Object>> trapTypes = new ArrayList<>();
+        for (Object[] row : alarmRepository.countTrapTypeSince(now.minusDays(7), org.springframework.data.domain.PageRequest.of(0, 6))) {
+            if (row[0] == null) continue;
+            trapTypes.add(Map.of("name", String.valueOf(row[0]), "value", ((Number) row[1]).longValue()));
+        }
+        m.put("alarmTypes", trapTypes);
+
+        // ---------- 告警最多设备 TopN ----------
+        Map<String, String> ipToName = new LinkedHashMap<>();
+        for (Device d : devices) {
+            ipToName.put(d.getIpAddress(), d.getName());
+        }
+        List<Map<String, Object>> topDevices = new ArrayList<>();
+        for (Object[] row : alarmRepository.countActiveAlarmsGroupByDeviceId(openStatuses)) {
+            if (row[0] == null) continue;
+            long count = ((Number) row[1]).longValue();
+            String name = devices.stream()
+                    .filter(d -> d.getId().equals(((Number) row[0]).longValue()))
+                    .map(Device::getName).findFirst().orElse("设备#" + row[0]);
+            topDevices.add(Map.of("name", name, "value", count));
+        }
+        topDevices.sort((a, b) -> Long.compare(((Number) b.get("value")).longValue(), ((Number) a.get("value")).longValue()));
+        m.put("topAlarmDevices", topDevices.stream().limit(6).toList());
+
+        // ---------- 资源占用 TopN（真实最新样本） ----------
+        Map<Long, String> idToName = new LinkedHashMap<>();
+        devices.forEach(d -> idToName.put(d.getId(), d.getName()));
+        List<Map<String, Object>> capacity = new ArrayList<>();
+        for (PerformanceData p : performanceDataRepository.findLatestSystemMetricsAllDevices()) {
+            if (p.getDevice() == null) continue;
+            // 只用代理 id 查名称，避免 getOrDefault 提前求值 Name 触发 N+1 懒加载
+            Long devId = p.getDevice().getId();
+            String devName = idToName.get(devId);
+            if (devName == null) {
+                devName = p.getDevice().getName();
+            }
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("name", devName);
+            row.put("cpu", p.getCpuUsage() != null ? Math.round(p.getCpuUsage() * 10) / 10.0 : null);
+            row.put("mem", p.getMemoryUsage() != null ? Math.round(p.getMemoryUsage() * 10) / 10.0 : null);
+            capacity.add(row);
+        }
+        capacity.sort((a, b) -> Double.compare(
+                b.get("cpu") == null ? -1 : ((Number) b.get("cpu")).doubleValue(),
+                a.get("cpu") == null ? -1 : ((Number) a.get("cpu")).doubleValue()));
+        m.put("capacityTop", capacity.stream().limit(6).toList());
+
+        // ---------- 最近告警 ----------
+        List<Map<String, Object>> recentAlarms = new ArrayList<>();
+        for (Alarm a : alarmRepository.findAllByOrderByOccurredAtDesc(
+                org.springframework.data.domain.PageRequest.of(0, 12))) {
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("id", a.getId());
+            row.put("title", a.getTitle());
+            row.put("severity", a.getSeverity() != null ? a.getSeverity().name() : null);
+            row.put("status", a.getStatus() != null ? a.getStatus().name() : null);
+            row.put("deviceIp", a.getDeviceIp());
+            row.put("deviceName", a.getDeviceIp() != null ? ipToName.getOrDefault(a.getDeviceIp(), a.getDeviceIp()) : "-");
+            row.put("occurredAt", a.getOccurredAt() != null ? a.getOccurredAt().toString() : null);
+            recentAlarms.add(row);
+        }
+        m.put("recentAlarms", recentAlarms);
+
+        // ---------- 代表事件 / 根因 ----------
+        List<Map<String, Object>> incidents = alarmCorrelationService.listIncidents();
+        long pending = incidents.stream().filter(r -> "pending".equals(String.valueOf(r.get("phase")))).count();
+        long inProgress = incidents.stream().filter(r -> "in_progress".equals(String.valueOf(r.get("phase")))).count();
+        Map<String, Object> corr = new LinkedHashMap<>();
+        corr.put("representativeCount", incidents.size());
+        corr.put("pendingCount", pending);
+        corr.put("inProgressCount", inProgress);
+        Map<String, Object> corrSnapshot = alarmCorrelationService.getCorrelationSnapshot();
+        corr.put("suppressedCount", corrSnapshot.getOrDefault("suppressedCount", 0));
+        corr.put("stormGroups", corrSnapshot.getOrDefault("stormGroups", 0));
+        m.put("correlation", corr);
+        m.put("incidents", incidents.stream().limit(8).toList());
+
+        Map<String, Object> rca = rcaService.analyze();
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> candidates = (List<Map<String, Object>>) rca.getOrDefault("candidates", List.of());
+        m.put("rcaCandidates", candidates.stream().limit(5).toList());
+        m.put("recentActions", unattendedOpsService.recentActions());
+
+        m.put("generatedAt", now.toString());
+        m.put("cached", false);
+        cachedDashboard = m;
+        lastDashboardAt = now;
+        return m;
+    }
+
+    private static Map<String, Object> severityItem(String key, String label, Map<String, Long> counts) {
+        Map<String, Object> item = new LinkedHashMap<>();
+        item.put("key", key);
+        item.put("name", label);
+        item.put("value", counts.getOrDefault(key, 0L));
+        return item;
+    }
+
+    private static String healthGrade(int score) {
+        if (score >= 90) return "优";
+        if (score >= 75) return "良";
+        if (score >= 60) return "中";
+        return "差";
+    }
+
+    public Map<String, Object> runUnattendedCycle() {        return unattendedOpsService.runCycle("api");
     }
 
     public Map<String, Object> runUnattendedForAlarm(Long alarmId, Long deviceId) {
