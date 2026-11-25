@@ -1902,7 +1902,7 @@ const initGraph = () => {
       }
     }
   })
-  
+
   // 绑定事件
   bindEvents()
 
@@ -2521,6 +2521,11 @@ const updateGraphData = () => {
     // changeData默认不重布局（relayoutAtChangeData: false）
     graph.changeData({ nodes, edges })
 
+    // 数据刷新后强制重绘一次，避免模型已更新但画布未重绘
+    try {
+      graph.paint?.()
+    } catch (e) {}
+
     if (needLayout) {
       // 仅当存在无坐标节点时，主动跑一次当前布局
       try {
@@ -2541,8 +2546,12 @@ const updateGraphData = () => {
 
     if (isFirstLoad.value) {
       isFirstLoad.value = false
-      // 初始比例100%，居中显示
-      applyZoom100()
+      // 首屏：内容超出容器时整图适配，否则保持 100% 居中
+      fitInitialView()
+      flushGraphCanvas()
+      // 小地图在事件防抖后才构建形状，分两档延迟再补一次上屏
+      setTimeout(() => flushGraphCanvas(), 150)
+      setTimeout(() => flushGraphCanvas(), 400)
     }
   } catch (e) {
     console.error('G6 全量刷新失败:', e)
@@ -2637,6 +2646,12 @@ const updateGraphDataSilent = () => {
         console.warn('添加边失败', id, err)
       }
     })
+
+    // 静默刷新后强制重绘一次，避免样式/新增项未上屏
+    try {
+      graph.paint?.()
+      flushGraphCanvas()
+    } catch (e) {}
   } catch (e) {
     console.error('G6 静默刷新失败:', e)
     // 失败时也不要graph.read重排，避免布局跳动
@@ -3062,6 +3077,63 @@ const applyZoom100 = () => {
   } catch (e) {}
   graph.zoomTo(1)
   zoomLevel.value = 1
+}
+
+// 首屏：内容超出容器时整图适配到可视区，避免两端节点与连线被裁切；否则保持 100% 居中
+const fitInitialView = () => {
+  if (!graph) return
+  try {
+    const nodes = graph.getNodes()
+    if (!nodes.length) return
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+    nodes.forEach(n => {
+      const m = n.getModel()
+      if (Number.isFinite(m.x) && Number.isFinite(m.y)) {
+        minX = Math.min(minX, m.x)
+        maxX = Math.max(maxX, m.x)
+        minY = Math.min(minY, m.y)
+        maxY = Math.max(maxY, m.y)
+      }
+    })
+    const pad = 80
+    const bboxW = maxX - minX + pad
+    const bboxH = maxY - minY + pad
+    const cw = graphContainer.value?.offsetWidth || 0
+    const ch = graphContainer.value?.offsetHeight || 0
+    if (cw && ch && (bboxW > cw || bboxH > ch)) {
+      graph.fitView(40)
+    } else {
+      applyZoom100()
+    }
+    zoomLevel.value = graph.getZoom()
+  } catch (e) {
+    applyZoom100()
+  }
+}
+
+// 同步强制上屏：释放可能挂起的 rAF 绘制帧并全量重绘，避免后台/无头等 rAF 被挂起时画布一直空白
+const flushGraphCanvas = () => {
+  if (!graph) return
+  const flushCanvas = (canvas) => {
+    if (!canvas) return
+    try {
+      canvas.set('drawFrame', null)
+      if (typeof canvas._drawAll === 'function') {
+        canvas._drawAll()
+      } else if (typeof canvas.draw === 'function') {
+        canvas.draw()
+      }
+    } catch (e) {}
+  }
+  flushCanvas(graph.get('canvas'))
+  try {
+    const plugins = graph.get('plugins') || []
+    const list = Array.isArray(plugins) ? plugins : Object.values(plugins)
+    list.forEach((plugin) => {
+      const canvas = plugin && plugin.get ? plugin.get('canvas') : null
+      flushCanvas(canvas)
+    })
+  } catch (e) {}
 }
 
 const zoomTo100 = () => {
@@ -4444,6 +4516,7 @@ const handleResize = () => {
   const h = graphContainer.value.offsetHeight
   if (w > 0 && h > 0) {
     graph.changeSize(w, h)
+    flushGraphCanvas()
   }
 }
 
