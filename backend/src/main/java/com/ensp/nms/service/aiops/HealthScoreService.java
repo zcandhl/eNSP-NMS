@@ -22,6 +22,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+/**
+ * 设备综合健康评分计算。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15 */
+
 @Service
 @RequiredArgsConstructor
 public class HealthScoreService {
@@ -221,9 +229,6 @@ public class HealthScoreService {
         return list;
     }
 
-    /**
-     * 根据历史反馈重排建议：无用票多的降权靠后，有用票多的上浮。
-     */
     private void rankSuggestionsByFeedback(List<Map<String, Object>> suggestions) {
         Map<String, long[]> stats = new HashMap<>();
         try {

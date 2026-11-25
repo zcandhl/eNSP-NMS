@@ -11,6 +11,14 @@ import org.springframework.data.repository.query.Param;
 import java.time.LocalDateTime;
 import java.util.List;
 
+/**
+ * 无人值守执行记录数据访问仓库：封装对应实体的持久化查询与写入。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15 */
+
 public interface AiopsUnattendedRunRepository extends JpaRepository<AiopsUnattendedRun, Long> {
 
     Page<AiopsUnattendedRun> findByOrderByStartedAtDesc(Pageable pageable);
@@ -31,7 +39,6 @@ public interface AiopsUnattendedRunRepository extends JpaRepository<AiopsUnatten
     @Query("DELETE FROM AiopsUnattendedRun r WHERE r.startedAt < :cutoff")
     int deleteByStartedAtBefore(@Param("cutoff") LocalDateTime cutoff);
 
-    /** 删除设备时解除历史运行记录的外键引用（保留审计历史，device_id 允许为空） */
     @Modifying
     @Query("UPDATE AiopsUnattendedRun r SET r.deviceId = NULL WHERE r.deviceId = :deviceId")
     int detachDevice(@Param("deviceId") Long deviceId);

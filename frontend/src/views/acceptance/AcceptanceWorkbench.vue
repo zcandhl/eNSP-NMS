@@ -1,9 +1,19 @@
+/**
+ * @file    AcceptanceWorkbench.vue
+ * @module  视图页/验收
+ * @desc    验收执行工作台。
+ *
+ * @author  ZC
+ * @date    2026-11-22 * @version 1.0.0
+ * @requires @element-plus/icons-vue, element-plus, pinia, vue, vue-router, @/api/acceptance, @/stores/auth, @/stores/project
+ */
+
 <template>
   <div class="nms-page acceptance-page">
     <div class="nms-page-header">
       <div class="nms-page-title-block">
         <h1 class="nms-page-title">验收工作台</h1>
-        <p class="nms-page-subtitle">方案可配置 · 逐项点亮 · 报告自动装配 · 数据取自批次快照</p>
+        <p class="nms-page-subtitle">预实施验证 · 交付核验 · 验收取证 —— 同一套检查项复用到底</p>
       </div>
       <div class="nms-page-actions acc-actions">
         <div class="act-group">
@@ -12,7 +22,7 @@
             {{ auth.displayName }}
           </el-tag>
           <el-tag v-if="mockMode" size="small" type="warning" effect="plain" class="mock-tag">
-            演示数据
+            离线数据
           </el-tag>
         </div>
         <div class="act-group">
@@ -56,7 +66,7 @@
       </div>
     </div>
 
-    <!-- 流程引导：四步走，跟着高亮走就不会迷路 -->
+    
     <div class="guide-strip">
       <el-steps :active="activeStep" align-center finish-status="success" class="guide-steps">
         <el-step title="① 选工程与方案" />
@@ -119,7 +129,7 @@
       </aside>
 
       <main class="acc-right">
-        <!-- 新工程刚建好还没方案：给出明确下一步，避免右栏一片空白 -->
+        
         <div v-if="!planId" class="no-plan-tip">
           <el-icon><InfoFilled /></el-icon>
           <span>当前工程还没有验收方案，执行台无对象可跑。</span>
@@ -156,7 +166,7 @@
               />
             </div>
           </el-tab-pane>
-          <!-- 数字孪生视图：整体拓扑 + 设备状态 + 批次可达性叠加 -->
+          
           <el-tab-pane label="数字孪生" name="twin" lazy>
             <div class="twin-wrap">
               <TwinTopology :batch="batch" />
@@ -166,7 +176,7 @@
       </main>
     </div>
 
-    <!-- 检查项只读详情：执行台不改方案，要看要改请到「方案设计」页 -->
+    
     <el-drawer v-model="detailVisible" :title="detailTitle" size="460px" direction="rtl">
       <div v-if="selectedCheck" class="ci-detail">
         <div class="cid-head">
@@ -239,7 +249,7 @@
       </div>
     </el-drawer>
 
-    <!-- 跨方案全局视角：所有正在执行的验收批次 -->
+    
     <el-dialog v-model="runningVisible" title="运行中的验收（全部方案）" width="760px">
       <el-table :data="globalRunning" size="small" border empty-text="当前没有正在执行的验收批次">
         <el-table-column prop="no" label="报告编号" width="170" />
@@ -273,7 +283,7 @@
       <div class="run-dialog-tip">每 4 秒自动刷新；点击"前往"切换到对应方案并选中该批次继续跟踪。</div>
     </el-dialog>
 
-    <!-- 使用引导：流程、状态含义、常见问题 -->
+    
     <el-drawer v-model="helpVisible" title="验收工作台 · 使用引导" size="600px" direction="rtl">
       <div class="help-body">
         <div class="help-sec">
@@ -326,7 +336,7 @@
         <div class="help-sec">
           <div class="hs-title">常见问题</div>
           <div class="hs-qa">
-            <p><b>顶部出现"演示数据"标签？</b>说明后端未启动或接口不通，当前展示的是演示数据，不是真实采集。请确认后端在 8080 运行后刷新页面。</p>
+            <p><b>顶部出现"离线数据"标签？</b>说明后端未启动或接口不通，当前展示的是离线缓存数据，不是真实采集。请确认后端在 8080 运行后刷新页面。</p>
             <p><b>检查项采集失败？</b>先在设备管理页确认目标设备在线、可远程管理；AC-1 走 Telnet（23 端口），其余设备走 SSH。</p>
             <p><b>批次停在"等待人工确认"？</b>这是正常环节（如故障预演项）：点开该项 → 确认执行/录入人工实测结论，批次才会继续收尾。</p>
             <p><b>报告页按钮灰色？</b>只有状态为"已完成"的批次才能出具报告；中断/失败的批次可删除后重跑。</p>
@@ -335,7 +345,7 @@
       </div>
     </el-drawer>
 
-    <!-- 人工确认表单：人工实测后录入结论与说明，作为验收记录 -->
+    
     <el-dialog
       v-model="confirmDialog"
       :title="`人工确认 · ${confirmTarget?.code || ''} ${confirmTarget?.title || ''}`"
@@ -416,7 +426,7 @@ const auth = useAuthStore()
 const router = useRouter()
 const route = useRoute()
 
-// owner（username）→ 真实姓名；未匹配（自由输入/历史数据）时原样显示
+// owner（username）→ 真实姓名；未匹配时原样显示
 function memberName(username) {
   const m = members.value.find((x) => x.username === username)
   return m ? m.realName : username
@@ -438,10 +448,9 @@ const rawVisible = ref(false)
 const rawItem = ref(null)
 let pollTimer = null
 
-// ── 右栏视图：运行结果 / 数字孪生（一次只渲染一个，避免争抢高度）──
+// 右栏视图：运行结果 / 数字孪生
 const rightTab = ref('result')
 
-// ── 检查项只读详情抽屉 ──
 const detailVisible = ref(false)
 const detailTitle = computed(() => {
   const c = checks.value.find((x) => x.id === selectedCheckId.value)
@@ -470,7 +479,6 @@ const paramRows = computed(() => {
     })
 })
 
-/** 参数值显示：枚举选项转中文（如 contains→包含），数组用顿号连接，其余原样 */
 function paramValueText(field, v) {
   const optLabel = (x) => {
     const o = (field?.options || []).find((op) => String(op.value) === String(x))
@@ -512,7 +520,6 @@ function checkTypeLabel(type) {
   return checkTypes.value.find((t) => t.type === type)?.label || type || '—'
 }
 
-/** 判定准则一句话：统一走 judgeRule.describeCheck，与方案设计/报告页同口径 */
 function judgeText(check) {
   return describeCheck(check, checkTypes.value)
 }
@@ -521,15 +528,13 @@ function briefMetrics(metrics, type) {
   return metricsText(type, metrics)
 }
 
-// ── 跨方案全局视角：运行中的验收批次 ──
 const globalRunning = ref([])
 const runningVisible = ref(false)
 let globalTimer = null
 
-// ── 流程引导 ──
 const helpVisible = ref(false)
 
-// 当前处于四步流程的哪一步：0选方案 1检查项 2运行 3出报告
+// 当前处于四步流程的哪一步：0选方案1检查项2运行3出报告
 const activeStep = computed(() => {
   if (!planId.value) return 0
   if (!enabledCount.value) return 1
@@ -561,7 +566,7 @@ async function refreshGlobalRunning() {
   try {
     globalRunning.value = await acceptanceApi.listRunningBatches()
   } catch {
-    /* 全局指示器失败静默，不影响工作台主流程 */
+    
   }
 }
 
@@ -570,7 +575,6 @@ function openRunningDialog() {
   refreshGlobalRunning()
 }
 
-/** 从全局运行列表跳转：切工程 → 切方案 → 选中该批次继续跟进度 */
 async function goToRunningBatch(row) {
   runningVisible.value = false
   try {
@@ -591,7 +595,7 @@ async function goToRunningBatch(row) {
   }
 }
 
-// 本地调试/演示辅助：?demo=run 自动运行一次；?demo=inspect 运行后展开 FINDING 项的原始输出
+// 本地调试辅助：?demo=run自动运行一次；?demo=inspect运行后展开FINDING项的原始输出
 const demoMode = new URLSearchParams(window.location.search).get('demo') || ''
 
 const checks = computed(() => planDetail.value?.checks || [])
@@ -634,11 +638,6 @@ function batchStatusText(b) {
   }[b.status] || '未知'
 }
 
-/**
- * 加载工程列表（走全局 store）。
- * preferId：从「工程管理」页带 ?projectId= 跳过来时定位工程；
- * projectId 变化时 watch 会触发 loadPlans，这里只在 id 未变时手动补一次。
- */
 async function loadProjects(preferId = null) {
   const before = projectId.value
   if (preferId != null && preferId !== before) projectStore.switchTo(preferId)
@@ -671,7 +670,6 @@ async function loadPlans() {
   }
 }
 
-/** 当前工程下没有方案（或工程被删）：把右栏彻底清空，不残留上一个工程的批次 */
 function resetPlanState() {
   planId.value = null
   planDetail.value = null
@@ -683,7 +681,7 @@ function resetPlanState() {
 
 async function loadPlanDetail() {
   const plan = await acceptanceApi.getPlan(planId.value)
-  // 兜底：后端若只返回 checksJson 字符串（旧版契约），就地解析成 checks 数组
+  // 兜底：后端若只返回checksJson字符串，就地解析成checks数组
   if (!plan.checks && plan.checksJson) {
     try {
       plan.checks = JSON.parse(plan.checksJson)
@@ -701,7 +699,7 @@ async function loadPlanDetail() {
 async function loadBatches() {
   const list = await acceptanceApi.listBatches(planId.value)
   batches.value = list || []
-  // 运行刚结束时保留当前批次；首次进入优先选最近一次已收尾（完成/失败/中断）的批次
+  // 运行刚结束时保留当前批次；首次进入优先选最近一次已收尾的批次
   const keep = batches.value.find((b) => b.batchId === batchId.value)
   const latestSettled = [...batches.value].reverse().find((b) => b.status !== 'RUNNING')
   const target = keep || latestSettled || batches.value[0]
@@ -714,7 +712,6 @@ async function loadBatches() {
   }
 }
 
-/** 执行台不改方案：所有方案/检查项维护都跳方案设计页 */
 function goPlanDesign() {
   router.push('/acceptance/plan')
 }
@@ -830,7 +827,7 @@ async function doStop() {
   }
 }
 
-// ── 人工确认：表单化（人工实测后录入结论，而非机械确认） ──
+// 人工确认：表单化
 const confirmDialog = ref(false)
 const confirmTarget = ref(null)
 const confirmForm = reactive({ decision: 'pass', note: '' })
@@ -862,7 +859,7 @@ async function submitConfirm() {
   }
 }
 
-// ── 确认提醒：pending 数量上升时弹通知；页面在后台时用浏览器通知 ──
+// 确认提醒：pending数量上升时弹通知；页面在后台时用浏览器通知
 const prevPending = ref(0)
 
 function notifyConfirm(item) {
@@ -885,7 +882,7 @@ function notifyConfirm(item) {
   }
 }
 
-// ── 作废 / 删除：DONE 只可作废（留痕），INTERRUPTED/FAILED 可删除 ──
+// 作废 / 删除：DONE只可作废，INTERRUPTED/FAILED可删除
 async function doVoid() {
   try {
     const { value } = await ElMessageBox.prompt(
@@ -927,29 +924,28 @@ function openRaw(item) {
   rawVisible.value = true
 }
 
-/** 出报告是「验收报告」页的职责，执行台只做流程交接 */
 function goReport() {
   router.push('/acceptance/report')
 }
 
 onMounted(async () => {
   checkTypes.value = await acceptanceApi.checkTypes()
-  // 成员列表（负责人下拉 + "我"标）：失败不阻塞主流程
+  // 成员列表：失败不阻塞主流程
   try {
     membersLoading.value = true
     members.value = await acceptanceApi.members()
   } catch (e) {
-    /* 成员接口不可用时保持空数组，下拉回退到编号 */
+    
   } finally {
     membersLoading.value = false
   }
   await loadProjects(Number(route.query.projectId) || null)
-  // 进入页面时若选中的是执行中的批次（另一个窗口发起的），继续跟进度
+  // 进入页面时若选中的是执行中的批次，继续跟进度
   if (batch.value?.status === 'RUNNING' && batch.value?.batchId) {
     running.value = true
     startPolling(batch.value.batchId)
   }
-  // 全局运行指示器：4 秒一轮，跨方案跟踪所有执行中的验收批次
+  // 全局运行指示器：4秒一轮，跨方案跟踪所有执行中的验收批次
   refreshGlobalRunning()
   globalTimer = setInterval(refreshGlobalRunning, 4000)
   if (demoMode === 'run' || demoMode === 'inspect') {
@@ -1118,7 +1114,7 @@ onBeforeUnmount(() => {
 .sel-plan {
   width: 186px;
 }
-/* 顶部操作按「身份 · 工程 · 方案 · 执行 · 产出」分组，避免 13 个控件挤成一排 */
+
 .acc-actions {
   gap: 0;
   align-items: center;
@@ -1307,7 +1303,6 @@ onBeforeUnmount(() => {
   }
 }
 
-/* 只读详情抽屉 */
 .ci-detail {
   display: flex;
   flex-direction: column;
@@ -1472,7 +1467,7 @@ onBeforeUnmount(() => {
     margin-left: auto;
   }
 }
-/* 右栏视图切换：一次只渲染一个视图，结果与拓扑不再争抢高度 */
+
 .acc-tabs {
   flex: 1 1 auto;
   min-height: 0;

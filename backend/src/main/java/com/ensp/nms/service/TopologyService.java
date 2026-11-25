@@ -16,6 +16,14 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.*;
 import java.util.stream.Collectors;
 
+/**
+ * 拓扑全量查询、节点位置保存与链路维护。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15 */
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -34,12 +42,6 @@ public class TopologyService {
         return getFullTopology(null);
     }
 
-    /**
-     * 全量拓扑，可按工程过滤（projectId 为 null 表示不限；负数表示"未分配工程"）。
-     *
-     * 设备按所属工程筛；链路两端都必须在筛后设备集合内才保留，
-     * 避免跨工程链路把别的工程的设备"拉"回视图里。
-     */
     public Map<String, Object> getFullTopology(Long projectId) {
         Map<String, Object> result = new HashMap<>();
 
@@ -65,7 +67,7 @@ public class TopologyService {
                     .collect(Collectors.toList());
         }
         
-        // 同一 device_id 若有多条位置记录（优化误写造成），保留最新一条，避免 toMap 抛错拖垮拓扑接口
+        // 同一device_id若有多条位置记录，保留最新一条，避免toMap抛错拖垮拓扑接口
         Map<Long, TopologyNode> nodeMap = topologyNodes.stream()
                 .collect(Collectors.toMap(
                         TopologyNode::getDeviceId,
@@ -129,7 +131,6 @@ public class TopologyService {
         return result;
     }
 
-    /** 工程过滤规则：null 不限；负数 = 未分配工程（project_id IS NULL） */
     private static boolean matchProject(Long deviceProjectId, Long projectId) {
         if (projectId == null) return true;
         if (projectId < 0) return deviceProjectId == null;
@@ -211,7 +212,7 @@ public class TopologyService {
                 if (c instanceof Number) count += ((Number) c).longValue();
                 severe = Boolean.TRUE.equals(fromDevice.get("severe"));
             }
-            // byIp 仅含 device_id IS NULL 的孤儿告警；IP 做规范化后再匹配
+            // byIp仅含device_id IS NULL的孤儿告警；IP做规范化后再匹配
             if (fromIp == null && !ip.isEmpty()) {
                 String nip = AlarmService.normalizeDeviceIp(ip);
                 if (nip != null && !nip.isEmpty() && !nip.equals(ip)) {
@@ -230,7 +231,7 @@ public class TopologyService {
 
     @Transactional
     public TopologyNode saveNodePosition(Long deviceId, Integer x, Integer y) {
-        // 优化残留可能导致同一 device_id 多条记录，findByDeviceId 会抛 IncorrectResultSize
+        // 优化残留可能导致同一device_id多条记录，findByDeviceId会抛IncorrectResultSize
         List<TopologyNode> existingNodes = topologyNodeRepository.findAllByDeviceId(deviceId);
 
         TopologyNode node;
@@ -345,9 +346,6 @@ public class TopologyService {
                 .collect(Collectors.toList());
     }
 
-    /**
-     * BFS 最短路径提示（只读计算，不改拓扑）。
-     */
     public Map<String, Object> findShortestPath(Long fromDeviceId, Long toDeviceId) {
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("fromDeviceId", fromDeviceId);

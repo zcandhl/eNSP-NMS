@@ -9,6 +9,15 @@ import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.Set;
 
+/**
+ * 角色实体，维护角色名称与关联权限。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15
+ */
+
 @Data
 @Entity
 @Table(name = "app_role")

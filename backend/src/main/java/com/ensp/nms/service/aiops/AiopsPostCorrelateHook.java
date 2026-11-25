@@ -15,8 +15,13 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * 关联完成后的减负钩子：可选自动确认连带 + Webhook 摘要 + 无人值守。
- */
+ * 关联完成后的减负钩子：自动确认连带、Webhook摘要与无人值守。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15 */
+
 @Slf4j
 @Service
 public class AiopsPostCorrelateHook {
@@ -48,7 +53,6 @@ public class AiopsPostCorrelateHook {
         this.unattendedOpsService = unattendedOpsService;
     }
 
-    /** 在关联事务提交后调用（异步），避免拖慢关联主路径 */
     @Async
     public void afterCorrelate(Map<String, Object> correlationResult) {
         try {
@@ -109,7 +113,7 @@ public class AiopsPostCorrelateHook {
                 filtered.add(row);
             }
         }
-        // 无达标事件且无连带/抑制时跳过（避免空刷）
+        // 无达标事件且无连带/抑制时跳过
         int suppressed = toInt(correlationResult.get("suppressedCount"));
         int secondary = toInt(correlationResult.get("secondaryMarked"));
         if (filtered.isEmpty() && suppressed == 0 && secondary == 0) {

@@ -12,17 +12,19 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 
 /**
- * 时序/告警数据保留策略：定期清理过期记录，避免表无限增长。
- */
+ * 时序/告警数据保留策略：定期清理过期记录。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15 */
+
 @Slf4j
 @Service
 public class RetentionService {
 
-    /** 性能数据保留天数 */
     public static final int PERFORMANCE_RETENTION_DAYS = 7;
-    /** 已清除告警保留天数 */
     public static final int CLEARED_ALARM_RETENTION_DAYS = 30;
-    /** 全部告警最长保留天数（含未清除历史） */
     public static final int ALARM_MAX_RETENTION_DAYS = 90;
 
     @Autowired
@@ -41,7 +43,6 @@ public class RetentionService {
     @org.springframework.context.annotation.Lazy
     private com.ensp.nms.service.aiops.LlmUnattendedOpsService unattendedOpsService;
 
-    /** 每天凌晨 2:15 清理超过 7 天的性能数据 */
     @Scheduled(cron = "0 15 2 * * ?")
     @Transactional
     public void cleanupOldPerformanceData() {
@@ -54,7 +55,6 @@ public class RetentionService {
         }
     }
 
-    /** 每天凌晨 2:30 清理过期告警 */
     @Scheduled(cron = "0 30 2 * * ?")
     @Transactional
     public void cleanupOldAlarms() {
@@ -75,7 +75,6 @@ public class RetentionService {
         }
     }
 
-    /** 每天凌晨 2:45：每设备仅保留最近 N 份配置备份 */
     @Scheduled(cron = "0 45 2 * * ?")
     @Transactional
     public void cleanupExcessDeviceConfigs() {
@@ -88,7 +87,6 @@ public class RetentionService {
         }
     }
 
-    /** 每天凌晨 3:00：操作日志保留 90 天且总量不超过上限 */
     @Scheduled(cron = "0 0 3 * * ?")
     @Transactional
     public void cleanupAuditLogs() {
@@ -102,7 +100,6 @@ public class RetentionService {
         }
     }
 
-    /** 每天凌晨 3:20：无人值守运行记录按策略天数清理 */
     @Scheduled(cron = "0 20 3 * * ?")
     @Transactional
     public void cleanupUnattendedRuns() {

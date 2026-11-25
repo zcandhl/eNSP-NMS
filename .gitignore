@@ -48,3 +48,12 @@ frontend/vite.config.js.timestamp-*.mjs
 
 # 商务/商务交付文档（勿提交公开仓库）
 delivery/
+
+# 软著申报材料（本地内部材料，含本地库凭据、构建脚本与截图）
+软著申报材料/
+
+# 内部验收报告、调试笔记与本地探针页
+docs/*.docx
+docs/ensp-ssh-setup.txt
+frontend/public/__seed.html
+frontend/public/_probe.html

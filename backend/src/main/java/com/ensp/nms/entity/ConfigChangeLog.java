@@ -6,6 +6,15 @@ import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.LocalDateTime;
 
+/**
+ * 配置变更日志实体，记录前后配置与变更结论。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15
+ */
+
 @Data
 @Entity
 @Table(name = "config_change_log")

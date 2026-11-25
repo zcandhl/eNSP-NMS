@@ -25,9 +25,13 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 滑动基线异常检测：均值 ± k·σ；固定阈值仍由 PerformanceAlertService 负责。
- * 默认忽略仿真指标，避免假数据污染 AIOps。
- */
+ * 滑动基线异常检测：均值±k·σ；固定阈值由PerformanceAlertService负责，默认忽略仿真指标。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15 */
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -96,7 +100,7 @@ public class AnomalyDetectService {
                     details.add(hit);
                     raiseAnomalyAlarm(device, hit);
                 } else {
-                    // 指标已回落基线内：关闭残留基线异常（含处理中）
+                    // 指标已回落基线内：关闭残留基线异常
                     try {
                         alarmService.clearBaselineAnomalyAlarms(device.getId(), metric,
                                 "基线检测指标已回落正常，自动关闭");
@@ -117,9 +121,6 @@ public class AnomalyDetectService {
         return result;
     }
 
-    /**
-     * 近期基线异常告警摘要，供智能中心展示。
-     */
     @Transactional(readOnly = true)
     public List<Map<String, Object>> listRecentAnomalies(int limit) {
         int lim = Math.max(1, Math.min(50, limit));

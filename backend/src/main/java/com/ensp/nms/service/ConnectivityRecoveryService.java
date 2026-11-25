@@ -14,10 +14,13 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * 连通性探测结果落库与恢复去抖：
- * 连续成功 → online + 自动清除连通性告警；连续失败 → offline。
- * 单次探测成功仅累计「疑似恢复」，不立刻闭环。
- */
+ * 连通性探测结果落库与恢复去抖：连续成功判online并清除连通性告警，连续失败判offline。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15 */
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -30,19 +33,6 @@ public class ConnectivityRecoveryService {
     private final ConcurrentHashMap<Long, Integer> successCounts = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<Long, Integer> failCounts = new ConcurrentHashMap<>();
 
-    /**
-     * 应用一次探测结果并写回设备状态。
-     *
-     * <p><b>必须传 deviceId 而不是 Device 实体</b>：采集线程在事务外 {@code findAll()} 得到的是
-     * detached 实体，直接 {@code save()} 会走 {@code merge}。若该设备已被删除，merge 会
-     * 把它当成新记录 INSERT 回来（表现为「删了又出现、要删很多次」）；若设备刚被编辑过，
-     * merge 会用旧快照整行覆盖（表现为「改了很多次都不生效」）。所以在事务内按 id 重新加载，
-     * 实体不存在即说明已被删除，直接丢弃本次探测结果。
-     *
-     * @param deviceId   设备主键
-     * @param reachable  本次是否可达
-     * @param probeMethod snmp / icmp
-     */
     @Transactional
     public ProbeApplyResult applyProbeResult(Long deviceId, boolean reachable, String probeMethod) {
         if (deviceId == null) {
@@ -50,7 +40,7 @@ public class ConnectivityRecoveryService {
         }
         Device device = deviceRepository.findById(deviceId).orElse(null);
         if (device == null) {
-            // 设备已被删除：清理去抖计数，绝不能用旧实体 merge 复活它
+            // 设备已被删除：清理去抖计数，绝不能用旧实体merge复活它
             successCounts.remove(deviceId);
             failCounts.remove(deviceId);
             ProbeApplyResult gone = ProbeApplyResult.empty();
@@ -85,7 +75,7 @@ public class ConnectivityRecoveryService {
             r.setConsecutiveFail(0);
 
             if (ok >= needOk) {
-                // 达标：确认在线，并清除仍未关闭的连通性告警（幂等）
+                // 达标：确认在线，并清除仍未关闭的连通性告警
                 boolean justConfirmed = ok == needOk;
                 successCounts.put(id, needOk);
                 boolean wasOffline = !"online".equalsIgnoreCase(previous);
@@ -97,7 +87,7 @@ public class ConnectivityRecoveryService {
                 int cleared = 0;
                 String reason = String.format("网管探测确认恢复：%s 连续可达 %d/%d 次",
                         probe.toUpperCase(), needOk, needOk);
-                // 仅「离线→在线」时清除整机离线告警；设备一直在线时绝不能清 linkDown
+                // 仅「离线→在线」时清除整机离线告警；设备一直在线时绝不能清linkDown
                 if (wasOffline) {
                     try {
                         cleared = alarmService.clearConnectivityAlarmsOnRecovery(
@@ -117,7 +107,7 @@ public class ConnectivityRecoveryService {
                             device.getName(), probe, ok, needOk, cleared, wasOffline);
                 }
             } else {
-                // 疑似恢复：不改 online，不关告警
+                // 疑似恢复：不改online，不关告警
                 if (!"online".equalsIgnoreCase(previous)) {
                     device.setStatus("offline");
                 }
@@ -143,7 +133,7 @@ public class ConnectivityRecoveryService {
                 r.setStatus("offline");
                 r.setStatusChanged(wasOnline);
                 deviceRepository.save(device);
-                // 探测确认离线 → 确保有 DEVICE_OFFLINE（在线→离线时合并计数；稳态离线仅补缺）
+                // 探测确认离线 → 确保有DEVICE_OFFLINE
                 int raised = 0;
                 try {
                     var alarm = alarmService.ensureDeviceOfflineAlarm(device, probe, wasOnline);

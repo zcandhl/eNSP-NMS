@@ -5,8 +5,13 @@ import com.ensp.nms.entity.Alarm;
 import java.util.Locale;
 
 /**
- * 关联与 RCA 共用的离线/链路告警关键词（避免两边规则不一致）。
- */
+ * 关联与RCA共用的离线/链路告警关键词。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15 */
+
 public final class AlarmKeywordMatcher {
 
     private AlarmKeywordMatcher() {

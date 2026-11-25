@@ -1,3 +1,13 @@
+/**
+ * @file    Dashboard.vue
+ * @module  视图页/总览
+ * @desc    系统总览看板：设备、告警与指标概览。
+ *
+ * @author  ZC
+ * @date    2026-08-15 * @version 1.0.0
+ * @requires @element-plus/icons-vue, echarts, element-plus, vue, vue-router, @/api/device, @/api/topology, @/composables/askOpsAssistant, @/composables/useThemeColors, @/stores/auth, @/stores/device
+ */
+
 <template>
   <div class="nms-page dashboard" v-loading="pageLoading">
     <div class="nms-page-header">
@@ -6,6 +16,7 @@
         <p class="nms-page-subtitle">
           欢迎回来，{{ auth.displayName }}
           <el-tag v-if="auth.roles[0]" size="small" type="info" effect="plain" style="margin-left: 8px;">{{ roleLabel }}</el-tag>
+          <span class="pos-tagline">预实施验证 · 交付核验 · 验收取证 —— 同一套检查项复用到底</span>
         </p>
       </div>
       <div class="nms-page-actions">
@@ -254,7 +265,7 @@
     />
     <el-form :model="discoverForm" label-width="100px">
       <el-form-item label="网段">
-        <el-input v-model="discoverForm.network" placeholder="例如: 192.168.56.0" />
+        <el-input v-model="discoverForm.network" placeholder="例如: 192.168.1.0" />
       </el-form-item>
       <el-form-item label="Community">
         <el-input v-model="discoverForm.community" placeholder="默认 public" />
@@ -347,7 +358,7 @@ const configHealth = ref({
 const showDiscoverDialog = ref(false)
 const discovering = ref(false)
 const discoverForm = ref({
-  network: '192.168.56.0',
+  network: '192.168.1.0',
   timeout: 30,
   community: 'public'
 })
@@ -593,6 +604,14 @@ onUnmounted(() => {
 <style scoped>
 .dashboard {
   min-height: 100%;
+}
+
+.pos-tagline {
+  margin-left: 12px;
+  padding-left: 12px;
+  border-left: 1px solid var(--nms-border, #dcdfe6);
+  color: var(--nms-text-muted, #8a97a6);
+  font-size: 12px;
 }
 
 .dash-time {

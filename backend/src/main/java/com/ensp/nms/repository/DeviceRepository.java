@@ -8,6 +8,14 @@ import org.springframework.stereotype.Repository;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * 设备台账数据访问仓库：封装对应实体的持久化查询与写入。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15 */
+
 @Repository
 public interface DeviceRepository extends JpaRepository<Device, Long>, JpaSpecificationExecutor<Device> {
 
@@ -18,6 +26,8 @@ public interface DeviceRepository extends JpaRepository<Device, Long>, JpaSpecif
     List<Device> findByNameContainingIgnoreCase(String name);
 
     List<Device> findByStatus(String status);
+
+    List<Device> findByDeviceType(String deviceType);
 
     List<Device> findByGroupId(Long groupId);
 

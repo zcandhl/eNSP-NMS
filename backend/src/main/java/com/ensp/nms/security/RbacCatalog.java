@@ -6,9 +6,13 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * 常见网管（NMS）权限与角色模板。
- * 参考 eSight / 网管运维分工：系统管理、运维操作、监控只读、告警值班、配置管理。
- */
+ * 网管权限与角色模板：系统管理、运维操作、监控只读、告警值班、配置管理。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15 */
+
 public final class RbacCatalog {
 
     private RbacCatalog() {}
@@ -18,32 +22,24 @@ public final class RbacCatalog {
     public record RoleDef(String name, String displayName, String description, Set<String> permissionNames) {}
 
     public static final List<PermDef> PERMISSIONS = List.of(
-            // 设备
             new PermDef("devices:read", "查看设备", "devices", "read", "查看设备列表与详情"),
             new PermDef("devices:write", "管理设备", "devices", "write", "新增、编辑、删除、刷新设备"),
             new PermDef("devices:discover", "设备发现", "devices", "discover", "网段扫描发现设备"),
-            // 告警
             new PermDef("alarms:read", "查看告警", "alarms", "read", "查看告警列表与统计"),
             new PermDef("alarms:handle", "处理告警", "alarms", "handle", "确认、清除告警"),
             new PermDef("alarms:write", "管理告警", "alarms", "write", "删除告警及批量管理"),
-            // 配置
             new PermDef("configs:read", "查看配置", "configs", "read", "查看备份、模板、变更记录、计划"),
             new PermDef("configs:write", "管理配置", "configs", "write", "备份、恢复、下发、模板与计划管理"),
-            // 拓扑
             new PermDef("topology:read", "查看拓扑", "topology", "read", "查看网络拓扑"),
             new PermDef("topology:write", "管理拓扑", "topology", "write", "编辑链路、布局、拓扑发现"),
-            // 性能
             new PermDef("performance:read", "查看性能", "performance", "read", "查看性能指标与性能告警"),
-            // 智能运维
             new PermDef("aiops:read", "智能运维", "aiops", "read", "查看智能中心、健康分、根因与运维助手"),
             new PermDef("aiops:write", "智能运维写操作", "aiops", "write", "无人值守策略、暂停/恢复、触发自动处置与写工具"),
-            // 远程
             new PermDef("webssh:connect", "WebSSH", "webssh", "connect", "通过 Web 终端登录设备"),
-            // 系统
             new PermDef("users:manage", "用户管理", "users", "manage", "管理账号与重置密码"),
             new PermDef("roles:manage", "角色权限", "roles", "manage", "管理角色及权限分配"),
             new PermDef("audit:read", "查看操作日志", "audit", "read", "查看全站用户操作审计日志"),
-            new PermDef("system:test", "系统测试", "system", "test", "SNMP/Mock 等测试工具")
+            new PermDef("system:test", "系统测试", "system", "test", "SNMP 探测等测试工具")
     );
 
     public static final Map<String, String> RESOURCE_LABELS = new LinkedHashMap<>();

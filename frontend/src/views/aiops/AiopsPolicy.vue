@@ -1,3 +1,14 @@
+/**
+ * @file    AiopsPolicy.vue
+ * @module  视图页/智能运维
+ * @desc    AIOps 策略参数配置页。
+ *
+ * @author  ZC
+ * @date    2026-08-15
+ * @version 1.0.0
+ * @requires element-plus, vue, @/api/device
+ */
+
 <template>
   <div class="aiops-policy" v-loading="loading">
     <el-alert type="info" :closable="false" show-icon class="mb"

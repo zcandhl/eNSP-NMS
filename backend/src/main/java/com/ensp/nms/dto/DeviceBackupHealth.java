@@ -4,7 +4,14 @@ import lombok.Data;
 
 import java.time.LocalDateTime;
 
-/** 设备配置备份健康态（清单行） */
+/**
+ * 设备配置备份健康态
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15 */
+
 @Data
 public class DeviceBackupHealth {
     private Long deviceId;
@@ -17,7 +24,6 @@ public class DeviceBackupHealth {
     private String lastBackupVersion;
     private String scheduleStatus; // success/failed/null
     private LocalDateTime scheduleLastRun;
-    /** never | ok | stale | failed */
     private String health;
     private String healthLabel;
 }

@@ -25,8 +25,13 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 验收工作台 API（与前端 api/acceptance.js 契约一一对应）。
- */
+ * 预实施验收项目、计划、检查项与执行批次的 REST 接口。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-11-22 */
+
 @RestController
 @RequestMapping("/api/acceptance")
 @RequiredArgsConstructor
@@ -43,12 +48,6 @@ public class AcceptanceController {
     private final AcceptanceAiService aiService;
     private final UserService userService;
 
-    // ── 成员（负责人下拉数据源：绑定系统账号，非自由文本） ──
-
-    /**
-     * 返回在职（active）用户的 username + realName。
-     * 检查项的 owner 存 username；前端用 realName 做展示，登录人自己的项会打"我"标。
-     */
     @GetMapping("/members")
     public ResponseEntity<List<Map<String, Object>>> members() {
         List<Map<String, Object>> out = new ArrayList<>();
@@ -60,12 +59,6 @@ public class AcceptanceController {
         return ResponseEntity.ok(out);
     }
 
-    // ── 项目 ──
-
-    /**
-     * 工程列表：deviceCount 不再取手工填写值，改为按工程真实纳管设备（Device.projectId）统计。
-     * linkCount = 该工程设备之间的组网链路数（两端都属本工程），工程页据此判断"组网是否已完成"。
-     */
     @GetMapping("/projects")
     public ResponseEntity<List<Map<String, Object>>> listProjects() {
         // 一次取全量设备 / 链路，在内存里按工程聚合，避免逐工程打库
@@ -115,16 +108,12 @@ public class AcceptanceController {
         return ResponseEntity.ok(projectService.update(id, patch));
     }
 
-    /** 删除工程：名下方案与历史批次级联删除（快照随工程失效，删除前前端有确认弹窗） */
     @DeleteMapping("/projects/{id}")
     public ResponseEntity<Void> deleteProject(@PathVariable Long id) {
         projectService.delete(id);
         return ResponseEntity.noContent().build();
     }
 
-    // ── 方案 ──
-
-    /** 新建方案：projectId 必填；template=true（默认）带标准六项检查模板 */
     @PostMapping("/plans")
     public ResponseEntity<AcceptancePlan> createPlan(@RequestBody Map<String, Object> payload) {
         String owner = currentUsername();
@@ -157,24 +146,19 @@ public class AcceptanceController {
         return ResponseEntity.ok(planService.save(id, payload));
     }
 
-    // ── 检查原语 schema ──
-
-    /** 当前登录账号 username（JWT principal），新建方案时作为检查项负责人初始值 */
     private static String currentUsername() {
         var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
         Object principal = auth == null ? null : auth.getPrincipal();
         if (principal instanceof String s && !s.isBlank() && !"anonymousUser".equals(s)) {
             return s;
         }
-        return principal == null ? "player4" : String.valueOf(principal);
+        return principal == null ? "system" : String.valueOf(principal);
     }
 
     @GetMapping("/check-types")
     public ResponseEntity<List<Map<String, Object>>> checkTypes() {
         return ResponseEntity.ok(AcceptanceCheckTypes.ALL);
     }
-
-    // ── 试运行 / 运行 / 批次 ──
 
     @PostMapping("/plans/{planId}/checks/{checkId}/dry-run")
     public ResponseEntity<Map<String, Object>> dryRun(@PathVariable Long planId,
@@ -199,7 +183,6 @@ public class AcceptanceController {
         return ResponseEntity.ok(runService.listBatches(planId));
     }
 
-    /** 全局视角：跨方案查询所有运行中的验收批次（含方案名/工程名与实时进度） */
     @GetMapping("/batches/running")
     public ResponseEntity<List<Map<String, Object>>> listRunningBatches() {
         return ResponseEntity.ok(runService.listRunningBatches());
@@ -238,15 +221,13 @@ public class AcceptanceController {
         return ResponseEntity.ok(Map.of("deleted", true, "batchId", batchId));
     }
 
-    // ── AI 摘要（AI 只建议、不裁决：结果仅供参考，不进验收结论） ──
+    // AI只建议、不裁决：结果仅供参考，不进验收结论
 
-    /** AI 通道状态：前端用于按钮置灰与提示 */
     @GetMapping("/ai/status")
     public ResponseEntity<Map<String, Object>> aiStatus() {
         return ResponseEntity.ok(aiService.status());
     }
 
-    /** 生成批次 AI 摘要（执行摘要/根因分析/整改建议） */
     @PostMapping("/batches/{batchId}/ai-summary")
     public ResponseEntity<Map<String, Object>> aiSummary(@PathVariable String batchId) {
         try {
@@ -254,13 +235,11 @@ public class AcceptanceController {
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         } catch (IllegalStateException e) {
-            // AI 未启用/调用失败：503 明确告知，不阻塞验收主流程
+            // AI未启用/调用失败：503明确告知，不阻塞验收主流程
             return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
                     .body(Map.of("error", e.getMessage()));
         }
     }
-
-    // ── 报告 ──
 
     @PostMapping("/batches/{batchId}/report")
     public ResponseEntity<Map<String, Object>> generateReport(@PathVariable String batchId) {

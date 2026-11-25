@@ -30,8 +30,13 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 /**
- * SNMP 性能采集：优先写入真实 OID 指标；缺失时对缺失指标做平滑回退（lab 风格）。
- */
+ * SNMP性能采集：优先写入真实OID指标，缺失指标做平滑回退。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15 */
+
 @Slf4j
 @Service
 public class PerformanceMonitorService {
@@ -66,7 +71,6 @@ public class PerformanceMonitorService {
 
     private final Map<Long, Map<Integer, Map<String, Long>>> lastPortData = new ConcurrentHashMap<>();
     private final Map<Long, LocalDateTime> lastCollectTime = new ConcurrentHashMap<>();
-    /** 设备接口 ifOperStatus 上次快照，用于检测 up→down（挂在本设备上，非拓扑造告警） */
     private final ConcurrentHashMap<String, String> lastIfOperStatus = new ConcurrentHashMap<>();
 
     private final ExecutorService collectExecutor = Executors.newFixedThreadPool(COLLECT_POOL_SIZE, r -> {
@@ -109,7 +113,7 @@ public class PerformanceMonitorService {
             Map<String, Boolean> caps = deviceCapabilityService.resolveCapabilities(device);
             String ip = device.getIpAddress();
 
-            // 无 SNMP 性能能力：仅做 ICMP 在线探测，不采性能
+            // 无SNMP性能能力：仅做ICMP在线探测，不采性能
             if (!Boolean.TRUE.equals(caps.get("performance"))) {
                 boolean up = Boolean.TRUE.equals(caps.get("icmp")) && icmpClient.ping(ip);
                 ConnectivityRecoveryService.ProbeApplyResult r =
@@ -204,7 +208,7 @@ public class PerformanceMonitorService {
         LocalDateTime lastTime = lastCollectTime.get(device.getId());
         Map<Integer, Map<String, Long>> lastData = lastPortData.computeIfAbsent(device.getId(), k -> new ConcurrentHashMap<>());
 
-        // 不论是否写流量点，都根据 ifOperStatus 边沿生成/清除本设备链路告警
+        // 不论是否写流量点，都根据ifOperStatus边沿生成/清除本设备链路告警
         syncInterfaceOperAlarms(device, portMetrics);
 
         if (portMetrics.isEmpty()) {
@@ -215,7 +219,7 @@ public class PerformanceMonitorService {
                 int portIndex = entry.getKey();
                 SnmpClient.PortMetrics pm = entry.getValue();
 
-                // 跳过完全无流量计数的端口（常见于未启用接口）
+                // 跳过完全无流量计数的端口
                 if (pm.inOctets == null && pm.outOctets == null) {
                     continue;
                 }
@@ -260,10 +264,6 @@ public class PerformanceMonitorService {
         lastPortData.put(device.getId(), lastData);
     }
 
-    /**
-     * 用本设备 SNMP ifOperStatus 边沿检测：仅当曾观测为 up 再变为 down 时告警。
-     * 挂在 10.10.10.1 自身，不依赖对端 Trap，也不按拓扑“编造”邻居告警。
-     */
     private void syncInterfaceOperAlarms(Device device, Map<Integer, SnmpClient.PortMetrics> portMetrics) {
         if (device == null || device.getId() == null || portMetrics == null || portMetrics.isEmpty()) {
             return;
@@ -282,7 +282,7 @@ public class PerformanceMonitorService {
             boolean nowDown = "down".equals(status) || "lowerlayerdown".equals(status);
             boolean nowUp = "up".equals(status);
             if (prev == null) {
-                // 首轮建基线；当前已是 up 时仍清理历史残留断开告警（含处理中）
+                // 首轮建基线；当前已是up时仍清理历史残留断开告警
                 if (nowUp) {
                     try {
                         alarmService.clearLinkDownAlarmsOnLinkUp(
@@ -330,7 +330,6 @@ public class PerformanceMonitorService {
                 || n.contains("tunnel") || n.contains("dialer");
     }
 
-    /** 对缺失的 CPU/内存/温度填入平滑回退值（低于告警阈值），保证历史曲线有点可画。 */
     private void fillMissingSystemMetricsWithSimulation(
             Device device, PerformanceData data, LocalDateTime now,
             boolean hasRealCpu, boolean hasRealMem) {

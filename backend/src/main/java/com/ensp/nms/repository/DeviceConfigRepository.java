@@ -13,6 +13,14 @@ import org.springframework.stereotype.Repository;
 
 import java.util.List;
 
+/**
+ * 设备配置备份数据访问仓库：封装对应实体的持久化查询与写入。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15 */
+
 @Repository
 public interface DeviceConfigRepository extends JpaRepository<DeviceConfig, Long> {
 
@@ -25,7 +33,6 @@ public interface DeviceConfigRepository extends JpaRepository<DeviceConfig, Long
     @Query("select distinct c.deviceId from DeviceConfig c")
     List<Long> findDistinctDeviceIds();
 
-    /** 每设备备份份数与最近时间（不加载 content） */
     @Query("""
             select c.deviceId as deviceId, count(c) as backupCount, max(c.createdAt) as lastBackupAt
             from DeviceConfig c
@@ -33,7 +40,6 @@ public interface DeviceConfigRepository extends JpaRepository<DeviceConfig, Long
             """)
     List<DeviceBackupStatsView> aggregateBackupStats();
 
-    /** 每设备最新备份元数据（不加载 content） */
     @Query("""
             select c.deviceId as deviceId, c.configType as configType,
                    c.configVersion as configVersion, c.createdAt as createdAt
@@ -44,7 +50,6 @@ public interface DeviceConfigRepository extends JpaRepository<DeviceConfig, Long
             """)
     List<DeviceBackupLatestView> findLatestMetaPerDevice();
 
-    /** bulk delete：立即执行 SQL，避免与父表 device 删除的 flush 顺序冲突 */
     @Modifying
     @Query("DELETE FROM DeviceConfig c WHERE c.deviceId = :deviceId")
     int deleteAllByDeviceId(@Param("deviceId") Long deviceId);

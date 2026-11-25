@@ -1,3 +1,13 @@
+/**
+ * @file    CheckItemForm.vue
+ * @module  视图页/验收组件
+ * @desc    检查项编辑表单组件。
+ *
+ * @author  ZC
+ * @date    2026-11-22 * @version 1.0.0
+ * @requires @element-plus/icons-vue, vue
+ */
+
 <template>
   <div class="check-form" :class="{ 'in-drawer': inDrawer }">
     <div class="form-head">
@@ -197,18 +207,18 @@ import { computed, ref, watch } from 'vue'
 import { Delete } from '@element-plus/icons-vue'
 import { describe, buildExpr, parseExpr, metricList, metricDef, opList } from './judgeRule'
 
-// 说明：父组件传入的 check 为同一引用，此处直接修改其属性，父级立即可见。
-// 这样避免为每个字段单独 emit，保持表单代码可读。
+// 说明：父组件传入的check为同一引用，此处直接修改其属性，父级立即可见。
+// 这样避免为每个字段单独emit，保持表单代码可读。
 const props = defineProps({
   check: { type: Object, required: true },
   checkTypes: { type: Array, default: () => [] },
   members: { type: Array, default: () => [] },
   membersLoading: { type: Boolean, default: false },
-  // 抽屉内使用时去掉顶部边框（抽屉本身已有分隔与留白）
+  // 抽屉内使用时去掉顶部边框
   inDrawer: { type: Boolean, default: false }
 })
 
-// 负责人候选：来自系统账号（后端 /members），无数据时回退到队员编号
+// 负责人候选：来自系统账号，无数据时留空
 const memberOptions = computed(() =>
   props.members.length
     ? props.members
@@ -237,7 +247,6 @@ const variables = [
 const typeMeta = computed(() => props.checkTypes.find((t) => t.type === props.check.type))
 const currentFields = computed(() => typeMeta.value?.fields || [])
 
-/* ── 判定规则：三段式（指标 + 比较 + 目标），生成 assertExpr 交给后端 ── */
 const metrics = computed(() => metricList(props.check.type))
 const advanced = ref(false)
 const ruleItems = ref([])
@@ -256,7 +265,6 @@ function isBool(it) {
   return metricDef(props.check.type, it.metric)?.kind === 'bool'
 }
 
-/** 内部条目 → 界面绑定字段：targetRef = param:xx / metric:xx / value */
 function toUi(it) {
   const ref =
     it.targetKind === 'param'
@@ -267,7 +275,6 @@ function toUi(it) {
   return { ...it, targetRef: ref }
 }
 
-/** 界面绑定字段 → 内部条目 */
 function toItem(it) {
   const out = { metric: it.metric, op: it.op }
   if (isBool(it)) return out
@@ -306,7 +313,6 @@ const sentence = computed(() => {
   return describe(items.map(toItem), props.check.type, props.check.params, labelOf)
 })
 
-/** 把界面上的规则写回 check（同时更新 assertExpr，后端只认它） */
 function syncRule() {
   const items = ruleItems.value.filter((it) => it.metric && it.op).map(toItem)
   if (!items.length) return
@@ -338,7 +344,6 @@ function removeRuleItem(idx) {
   syncRule()
 }
 
-/** 高级写法手改后，尝试重新解析回三段式 */
 function syncFromExpr() {
   const parsed = parseExpr(props.check.assertExpr, props.check.type, paramKeys.value)
   if (parsed && parsed.length) ruleItems.value = parsed.map(toUi)
@@ -361,7 +366,6 @@ function toggleAdvanced() {
 
 initRule()
 watch(() => props.check.type, () => initRule())
-
 
 // 判定表达式校验：只做静态检查，不执行用户输入
 const assertError = computed(() => {
@@ -468,7 +472,7 @@ function onTypeChange(type) {
   color: var(--el-color-danger);
   margin-top: 2px;
 }
-/* ── 判定规则三段式 ── */
+
 .rule-box {
   width: 100%;
   border: 1px solid var(--el-border-color-lighter);

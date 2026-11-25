@@ -10,6 +10,15 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * 配置模板的持久化维护与按类型、分类检索。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15
+ */
+
 @Slf4j
 @Service
 @RequiredArgsConstructor

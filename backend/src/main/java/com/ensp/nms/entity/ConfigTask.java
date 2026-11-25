@@ -6,15 +6,21 @@ import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.LocalDateTime;
 
-/**
- * 配置异步任务持久化：重启后可查历史，内存态仍用于实时进度。
- */
 @Data
 @Entity
 @Table(name = "config_task", indexes = {
         @Index(name = "idx_config_task_created", columnList = "created_at"),
         @Index(name = "idx_config_task_status", columnList = "status")
 })
+
+/**
+ * 配置异步任务实体，记录恢复、下发与批量任务进度。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15 */
+
 public class ConfigTask {
 
     @Id
@@ -44,11 +50,9 @@ public class ConfigTask {
     @Column(columnDefinition = "TEXT")
     private String error;
 
-    /** 结果 JSON */
     @Column(name = "result_json", columnDefinition = "LONGTEXT")
     private String resultJson;
 
-    /** 请求快照，供分波继续 / 失败重试 */
     @Column(name = "request_json", columnDefinition = "LONGTEXT")
     private String requestJson;
 

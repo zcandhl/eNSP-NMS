@@ -1,3 +1,13 @@
+/**
+ * @file    AcceptanceOverview.vue
+ * @module  视图页/验收
+ * @desc    验收项目总览页。
+ *
+ * @author  ZC
+ * @date    2026-11-22 * @version 1.0.0
+ * @requires pinia, vue, vue-router, @/api/acceptance, @/stores/project
+ */
+
 <template>
   <div class="nms-page acc-overview" v-loading="loading">
     <div class="nms-page-header">
@@ -161,7 +171,7 @@ const subtitle = computed(() => {
   const running = batches.value.filter((b) => b.status === 'RUNNING').length
   const parts = [projectName.value, `${plans.value.length} 个方案`, `${batches.value.length} 个批次`]
   if (running) parts.push(`${running} 个正在运行`)
-  if (mockMode.value) parts.push('演示数据')
+  if (mockMode.value) parts.push('离线数据')
   return parts.filter(Boolean).join(' · ')
 })
 
@@ -183,7 +193,7 @@ const sortedBatches = computed(() =>
   [...batches.value].sort((a, b) => (ts(b.startedAt) || 0) - (ts(a.startedAt) || 0))
 )
 
-// 柱图刻度：p 为距顶部百分比，v 为对应通过率刻度值
+// 柱图刻度：p为距顶部百分比，v为对应通过率刻度值
 const GRID = [
   { p: 0, v: 100 },
   { p: 25, v: 75 },
@@ -191,16 +201,11 @@ const GRID = [
   { p: 75, v: 25 },
   { p: 100, v: 0 }
 ]
-// 柱底下方留给「数值 + 批次号」两行的固定高度，需与 .bar-val / .bar-label 的高度之和一致
+// 柱底下方留给「数值 + 批次号」两行的固定高度，需与 .bar-val / .bar-label的高度之和一致
 const LABEL_ZONE = 44
 
 const doneBatches = computed(() => sortedBatches.value.filter((b) => b.status === 'DONE'))
 
-/**
- * 最近一个"有判定结果"的批次。
- * 不限定 DONE：中断/失败批次里已判定的项仍然是真实结果，直接丢掉会让总览一片空白。
- * 指标卡脚注会如实标出批次状态（例如"已中断"），不把残缺批次说成完整结论。
- */
 const lastResult = computed(
   () =>
     sortedBatches.value.find((b) =>
@@ -224,11 +229,11 @@ const trend = computed(() =>
     .map((b) => {
       const s = statsOf(b)
       const full = String(b.no || b.batchId || '')
-      // 批次号形如 YS-20261113-014，柱子下方只放末段；完整号放 title
+      // 批次号形如YS-20261113-014，柱子下方只放末段；完整号放title
       const seg = full.split('-').filter(Boolean)
       return {
         rate: s.rate,
-        // 柱高按百分比换算，0% 也留 2% 的可见底座
+        // 柱高按百分比换算，0% 也留2% 的可见底座
         barH: Math.max(2, Math.min(100, s.rate)),
         label: full,
         short: seg.length > 1 ? seg[seg.length - 1] : full
@@ -313,7 +318,7 @@ const metrics = computed(() => {
     {
       key: 'duration',
       label: '最近完成批次耗时',
-      // 中断批次的 finishedAt 是"服务重启时刻"，不是真实结束时间，不能当耗时用
+      // 中断批次的finishedAt是"服务重启时刻"，不是真实结束时间，不能当耗时用
       value: done.length ? durationText(done[0]) : '—',
       unit: '',
       foot: done.length ? done[0].no || done[0].batchId : '暂无已完成批次',
@@ -334,7 +339,6 @@ function durationText(b) {
   return `${s} 秒`
 }
 
-/** 只有正常跑完的批次才有"耗时"；中断/失败的结束时间是回收时补写的，不能算 */
 function runDurationText(b) {
   return b && b.status === 'DONE' ? durationText(b) : '未完成'
 }
@@ -390,8 +394,8 @@ async function reload() {
   }
 }
 
-// 总览是只读看板：不在页头放主按钮，执行入口弱化为批次面板的"去执行台"文字链，
-// 避免"看板"长出"动作页"的语法（点进去反而是一张空执行页）。
+// 总览是只读看板：不在页头放主按钮，执行入口弱化为批次面板的"去执行台"文字链
+// 避免"看板"长出"动作页"的语法。
 function goWorkbench() {
   router.push(plans.value.length ? '/acceptance/workbench' : '/acceptance/plan')
 }
@@ -402,7 +406,7 @@ function goReport() {
 
 onMounted(reload)
 
-// 顶栏切换工程 → 本页自动刷新（store 是唯一事实来源）
+// 顶栏切换工程 → 本页自动刷新
 watch(
   () => projectStore.projectId,
   (id, old) => {
@@ -428,7 +432,6 @@ watch(
   height: auto;
 }
 
-/* 指标卡 */
 .metric-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -489,7 +492,6 @@ watch(
   color: var(--nms-text-muted);
 }
 
-/* 趋势 + 缺陷 */
 .ov-row {
   display: flex;
   gap: 16px;
@@ -531,7 +533,6 @@ watch(
   color: var(--nms-text-muted);
 }
 
-/* 坐标图：左侧刻度 + 绘图区（网格线 + 柱） */
 .chart {
   display: flex;
   flex: 1 1 auto;
@@ -586,7 +587,7 @@ watch(
 }
 
 .bar-col {
-  /* 关键：限制单根柱的最大宽度。批次少的时候不再被拉成整块色板 */
+  
   flex: 1 1 0;
   max-width: 84px;
   min-width: 0;
@@ -596,7 +597,6 @@ watch(
   height: 100%;
 }
 
-/* 柱高百分比按这块区域算：整体高度减去下方两行文字 */
 .bar-slot {
   height: calc(100% - 44px);
   display: flex;
@@ -627,7 +627,6 @@ watch(
   font-weight: 600;
 }
 
-/* 柱子下方批次号：只有末段（014），完整号在 title 里 */
 .bar-label {
   height: 18px;
   line-height: 18px;
@@ -642,7 +641,6 @@ watch(
   color: var(--nms-text-secondary);
   font-weight: 600;
 }
-
 
 .defect-body {
   flex: 1;
@@ -751,7 +749,6 @@ watch(
   margin-top: 2px;
 }
 
-/* 批次表 */
 .batch-table {
   width: 100%;
 }

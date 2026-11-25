@@ -20,6 +20,14 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+/**
+ * LLM 对话、辅助建议、工具规划与连接测试。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15 */
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -146,9 +154,6 @@ public class LlmAssistantService {
         }
     }
 
-    /**
-     * 意图优先作业闭环：识别意图 → 按意图采证据 → 结论与可确认动作。
-     */
     public Map<String, Object> assist(String question, Long deviceId, Long alarmId, String pagePath,
                                       List<Map<String, String>> history) {
         String q = question == null ? "" : question.trim();
@@ -276,7 +281,6 @@ public class LlmAssistantService {
         }
     }
 
-    /** 意图分类：决定后续证据与是否必须有设备/告警焦点。 */
     private AssistIntent classifyIntent(String q, Map<String, Object> nmsCtx, Long deviceId, Long alarmId) {
         String blob = (q == null ? "" : q).toLowerCase(Locale.ROOT);
         String scenario = nmsCtx.get("scenario") != null ? String.valueOf(nmsCtx.get("scenario")) : "";
@@ -321,7 +325,7 @@ public class LlmAssistantService {
             // 无焦点的泛化诊断 → 全网；有焦点上面已覆盖
             return AssistIntent.NETWORK_OVERVIEW;
         }
-        // 未识别的闲聊/其它：仍给全网态势，但标记为 GENERAL
+        // 未识别的闲聊/其它：仍给全网态势，但标记为GENERAL
         return AssistIntent.GENERAL;
     }
 
@@ -356,7 +360,7 @@ public class LlmAssistantService {
                 plan.add(tool("search_devices", Map.of("keyword", kw), "搜索设备", false));
             }
             case CONFIG_COMMANDS -> {
-                // 无设备也可给通用华为 eNSP 命令模板
+                // 无设备也可给通用华为命令模板
                 Map<String, Object> args = new LinkedHashMap<>();
                 if (hasDevice) args.put("deviceId", ctxDevice);
                 args.put("intent", blob.contains("vlan") ? "vlan"
@@ -483,7 +487,6 @@ public class LlmAssistantService {
         return m;
     }
 
-    /** 按焦点给出可点击的下一步（写操作 needConfirm=true） */
     private List<Map<String, Object>> nextStepTools(Map<String, Object> nmsCtx, Long deviceId, Long alarmId) {
         List<Map<String, Object>> tools = new ArrayList<>();
         boolean closed = Boolean.TRUE.equals(nmsCtx != null ? nmsCtx.get("focusClosed") : null);
@@ -559,7 +562,7 @@ public class LlmAssistantService {
         return sb.toString().trim();
     }
 
-    /** 助手意图：决定证据采集；设备焦点为可选加深，不是提问门槛。 */
+/** 助手意图：决定证据采集；设备焦点为可选加深，不是提问门槛。 */
     private enum AssistIntent {
         NETWORK_OVERVIEW("NETWORK_OVERVIEW", "全网态势", false, false),
         DEVICE_DIAGNOSE("DEVICE_DIAGNOSE", "设备诊断", true, true),
@@ -574,7 +577,6 @@ public class LlmAssistantService {
 
         private final String code;
         private final String label;
-        /** 有设备时证据更准，但不阻止无设备提问 */
         private final boolean prefersDevice;
         private final boolean allowsPlaybookWrites;
 
@@ -605,9 +607,6 @@ public class LlmAssistantService {
         return toolExecutor.execute(name, args, confirmed);
     }
 
-    /**
-     * 无人值守专用规划：只返回 SAFE 工具列表；失败时 ok=false 由调用方回退规则。
-     */
     public Map<String, Object> planForUnattended(Long alarmId, Long deviceId, int maxSteps) {
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("alarmId", alarmId);
@@ -655,7 +654,7 @@ public class LlmAssistantService {
             List<Map<String, Object>> tools = filterUnattendedSafe(
                     sanitizeTools(parsed.tools(), nmsCtx, deviceId, alarmId), limit);
             if (tools.isEmpty()) {
-                // 本地模型常只返回散文：用场景推荐工具对齐，仍记为 LLM 路径（带对齐标记）
+                // 本地模型常只返回散文：用场景推荐工具对齐，仍记为LLM路径
                 tools = filterUnattendedSafe(scenarioTemplateTools(nmsCtx, deviceId, alarmId), limit);
                 if (!tools.isEmpty()) {
                     out.put("ok", true);
@@ -690,7 +689,7 @@ public class LlmAssistantService {
                         reason = root.get("reason").asText();
                     }
                 }
-            } catch (Exception ignored) { /* ignore */ }
+} catch (Exception ignored) { /* ignore */ }
             out.put("reason", truncateReason(reason));
             out.put("tools", tools);
             return out;
@@ -866,7 +865,6 @@ public class LlmAssistantService {
         return new ParsedAnswer(text, tools, parsedOk);
     }
 
-    /** 从起始 { 提取平衡的 JSON 对象（容忍尾部杂文） */
     private String extractBalancedJson(String s) {
         if (s == null || s.isBlank()) return "";
         int depth = 0;
@@ -939,7 +937,6 @@ public class LlmAssistantService {
         }
     }
 
-    /** 仅 CLEARED 视为已关闭；ACK=处理中，仍可标准处置 */
     private boolean isFocusClosed(Map<String, Object> nmsCtx) {
         if (nmsCtx == null) return false;
         if (Boolean.TRUE.equals(nmsCtx.get("focusClosed"))) return true;
@@ -1116,7 +1113,7 @@ public class LlmAssistantService {
             tools.add(0, tool("inspect", Map.of(), "重算关联与根因", false));
         }
 
-        // 去重并限制 3
+        // 去重并限制3
         Map<String, Map<String, Object>> uniq = new LinkedHashMap<>();
         for (Map<String, Object> t : tools) {
             uniq.putIfAbsent(String.valueOf(t.get("name")), t);

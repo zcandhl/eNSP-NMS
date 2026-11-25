@@ -4,23 +4,24 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 9 类检查原语定义（GET /api/acceptance/check-types 返回结构）。
+ * 验收检查项类型定义与取值约束。
  *
- * 前端按这里的 fields 动态渲染表单，新增第 10 类只加一条数据，前端零改动。
- * fields.kind: number | text | select
- */
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-11-22 */
+
 public final class AcceptanceCheckTypes {
 
     private AcceptanceCheckTypes() {
     }
 
-    /** 通用设备范围字段：路由类巡检不下发二层接入交换机；空 = 全部（兼容历史方案） */
     private static final Map<String, Object> FIELD_DEVICE_TYPES = Map.of(
             "key", "deviceTypes", "label", "设备类型范围（空=全部，逗号分隔：router/switch/ac/other）",
             "kind", "text", "default", "", "placeholder", "如 router 或 router,switch");
     private static final Map<String, Object> FIELD_DEVICE_NAMES = Map.of(
             "key", "deviceNames", "label", "设备名单（空=不限，逗号分隔设备名）",
-            "kind", "text", "default", "", "placeholder", "如 AR2220-路由器,SW-10.10.10.6");
+            "kind", "text", "default", "", "placeholder", "如 核心路由器-01, 接入交换机-01");
 
     public static final List<Map<String, Object>> ALL = List.of(
             Map.of(

@@ -1,3 +1,14 @@
+/**
+ * @file    main.js
+ * @module  应用入口
+ * @desc    应用入口：创建 Vue 实例，注册 Pinia、路由、Element Plus 与全局指令。
+ *
+ * @author  ZC
+ * @date    2026-08-15
+ * @version 1.0.0
+ * @requires @element-plus/icons-vue, element-plus, pinia, vue
+ */
+
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import ElementPlus from 'element-plus'

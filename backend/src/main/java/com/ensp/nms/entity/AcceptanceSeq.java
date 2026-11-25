@@ -7,17 +7,18 @@ import jakarta.persistence.Table;
 import lombok.Data;
 
 /**
- * 验收序号计数器：批次号 / 报告编号的持久化自增源。
+ * 验收单号序列实体，用于生成批次编号。
  *
- * 为什么不用 count()+1：批次会随方案、工程级联删除，count 会回退，
- * 导致批次号主键冲突、报告编号重号。计数器只增不减，删除历史批次也不会回收号段。
- */
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-11-22 */
+
 @Data
 @Entity
 @Table(name = "acceptance_seq")
 public class AcceptanceSeq {
 
-    /** 号段作用域，如 acceptance.batch */
     @Id
     @Column(name = "scope", length = 60)
     private String scope;

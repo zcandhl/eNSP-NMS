@@ -1,3 +1,13 @@
+/**
+ * @file    OpsInlineShell.vue
+ * @module  运维助手组件
+ * @desc    行内运维操作壳层组件。
+ *
+ * @author  ZC
+ * @date    2026-08-15 * @version 1.0.0
+ * @requires @element-plus/icons-vue, @/components/ops-assistant/OpsAssistantPanel, @/composables/useOpsInlinePanel
+ */
+
 <template>
   <aside
     class="ops-inline"
@@ -31,7 +41,7 @@ import { useOpsInlinePanel } from '@/composables/useOpsInlinePanel'
 const props = defineProps({
   storageKey: { type: String, required: true },
   defaultOpen: { type: Boolean, default: false },
-  /** 工作台等已锁视口高度：填满父列，不用 sticky */
+  
   fillParent: { type: Boolean, default: false }
 })
 
@@ -50,7 +60,7 @@ defineExpose({ open, expand, collapse })
   flex-direction: column;
   overflow-anchor: none;
 }
-/* 业务页（告警/性能/配置）：贴视口，不撑高整页 */
+
 .ops-inline:not(.is-fill) {
   align-self: start;
   position: sticky;

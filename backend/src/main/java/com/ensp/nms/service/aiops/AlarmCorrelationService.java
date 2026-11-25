@@ -31,7 +31,12 @@ import java.util.stream.Collectors;
 
 /**
  * 告警风暴收敛、链路两端关联、拓扑连带降权。
- */
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15 */
+
 @Slf4j
 @Service
 public class AlarmCorrelationService {
@@ -42,7 +47,6 @@ public class AlarmCorrelationService {
     private final AiopsPolicyProperties policyProperties;
     private final AiopsPostCorrelateHook postCorrelateHook;
 
-    /** 最近一次关联结果快照，供 overview 等只读接口使用，避免 GET 触发全量写库 */
     private final AtomicReference<Map<String, Object>> lastSnapshot = new AtomicReference<>(emptySnapshot());
 
     public AlarmCorrelationService(
@@ -68,7 +72,6 @@ public class AlarmCorrelationService {
         }
     }
 
-    /** 只读：返回定时任务缓存的关联统计，不写库 */
     public Map<String, Object> getCorrelationSnapshot() {
         return new LinkedHashMap<>(lastSnapshot.get());
     }
@@ -126,7 +129,6 @@ public class AlarmCorrelationService {
         return java.util.Collections.unmodifiableMap(new LinkedHashMap<>(src));
     }
 
-    /** 同设备 + 同标题 + 10 分钟窗口 → 最早一条为代表，其余挂 parent */
     private int applyStormGrouping(List<Alarm> open) {
         Map<String, List<Alarm>> groups = new HashMap<>();
         for (Alarm a : open) {
@@ -160,7 +162,6 @@ public class AlarmCorrelationService {
         return groupsWithChildren;
     }
 
-    /** 拓扑直连两端在时间窗内均有离线/链路类告警 → 标记 LINK */
     private int applyLinkCorrelation(List<Alarm> open) {
         List<TopologyLink> links = topologyLinkRepository.findAll();
         Map<Long, List<Alarm>> byDevice = open.stream()
@@ -221,7 +222,6 @@ public class AlarmCorrelationService {
         return pairs;
     }
 
-    /** 上游离线时，将邻居侧的离线/不可达告警标为连带 */
     private int applyTopologySecondary(List<Alarm> open) {
         List<Device> devices = deviceRepository.findAll();
         Set<Long> offlineIds = devices.stream()
@@ -252,7 +252,7 @@ public class AlarmCorrelationService {
             int selfDegree = neighbors.size();
             int upOfflineNbr = (int) adj.getOrDefault(upstream, Set.of()).stream().filter(offlineIds::contains).count();
             int selfOfflineNbr = (int) neighbors.stream().filter(offlineIds::contains).count();
-            // 自身也离线：仅当邻居更像枢纽（度数更高或离线邻居更多）时标连带
+            // 自身也离线：仅当邻居更像枢纽时标连带
             if (offlineIds.contains(deviceId) && !Objects.equals(deviceId, upstream)) {
                 boolean hubber = upDegree > selfDegree
                         || (upDegree == selfDegree && upOfflineNbr >= selfOfflineNbr);
@@ -276,9 +276,6 @@ public class AlarmCorrelationService {
         return marked;
     }
 
-    /**
-     * 在离线邻居中优先选拓扑度数高、离线邻居多的枢纽作为上游根。
-     */
     private Long pickBestUpstream(Set<Long> neighbors, Set<Long> offlineIds, Map<Long, Set<Long>> adj) {
         return neighbors.stream()
                 .filter(offlineIds::contains)
@@ -329,7 +326,6 @@ public class AlarmCorrelationService {
         return s == null ? "" : s;
     }
 
-    /** 构建收敛后的事件列表（仅代表告警；含近期已关闭便于筛选） */
     @Transactional(readOnly = true)
     public List<Map<String, Object>> listIncidents() {
         List<Alarm> open = alarmRepository.findByStatusInOrderByOccurredAtDesc(
@@ -373,7 +369,7 @@ public class AlarmCorrelationService {
             boolean closed = a.getStatus() == Alarm.Status.CLEARED;
             row.put("phase", phase);
             row.put("closed", closed);
-            // handled 仅表示已关闭（兼容旧字段；ACK≠办结）
+            // handled仅表示已关闭
             row.put("handled", closed);
             row.put("inProgress", a.getStatus() == Alarm.Status.ACKNOWLEDGED);
             // 排序：待处理 → 处理中 → 已关闭；连带靠后

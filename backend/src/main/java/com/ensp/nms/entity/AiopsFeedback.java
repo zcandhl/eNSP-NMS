@@ -3,6 +3,14 @@ package com.ensp.nms.entity;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
+/**
+ * 智能运维结论反馈实体，记录有用性评价与备注。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15 */
+
 @Entity
 @Table(name = "aiops_feedback")
 public class AiopsFeedback {
@@ -11,7 +19,6 @@ public class AiopsFeedback {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    /** rca / suggestion / assistant */
     @Column(nullable = false, length = 40)
     private String targetType;
 

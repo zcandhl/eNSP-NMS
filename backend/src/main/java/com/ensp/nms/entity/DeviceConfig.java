@@ -6,6 +6,15 @@ import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.LocalDateTime;
 
+/**
+ * 设备配置备份实体，保存配置快照文本与来源。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15
+ */
+
 @Data
 @Entity
 @Table(name = "device_config")

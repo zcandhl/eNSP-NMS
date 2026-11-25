@@ -28,8 +28,13 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * 只读聚合网管上下文，供 LLM system prompt 注入。
- */
+ * 只读聚合网管上下文，供LLM system prompt注入。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15 */
+
 @Service
 public class NmsContextBuilder {
 
@@ -172,7 +177,7 @@ public class NmsContextBuilder {
                         .filter(a -> Objects.equals(a.getParentAlarmId(), alarmId))
                         .count();
                 brief.put("childActiveCount", childNoise);
-                // 同类近期（resolvedAlarm 为 effectively final，可供 lambda 引用）
+                // 同类近期
                 final Long focusAlarmDeviceId = resolvedAlarm.getDeviceId();
                 String titlePrefix = resolvedAlarm.getTitle() != null && resolvedAlarm.getTitle().length() > 8
                         ? resolvedAlarm.getTitle().substring(0, 8) : resolvedAlarm.getTitle();
@@ -219,7 +224,7 @@ public class NmsContextBuilder {
                 ctx.put("focusDevice", brief);
             });
 
-            // 拓扑邻居（最多 8）
+            // 拓扑邻居
             try {
                 List<Map<String, Object>> neighbors = topologyService.getDeviceNeighbors(focusDeviceId);
                 ctx.put("focusTopoNeighbors", neighbors.stream().limit(8).toList());
@@ -243,7 +248,7 @@ public class NmsContextBuilder {
                 // optional
             }
 
-            // 配置摘要（不下发全文）
+            // 配置摘要
             try {
                 List<DeviceConfig> backups = deviceConfigRepository
                         .findByDeviceIdOrderByCreatedAtDesc(focusDeviceId);

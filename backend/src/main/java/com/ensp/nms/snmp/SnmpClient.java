@@ -16,6 +16,14 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * SNMP 读写、可达性探测、指标采集与邻居发现。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15 */
+
 @Slf4j
 @Component
 public class SnmpClient {
@@ -27,10 +35,6 @@ public class SnmpClient {
         return get(ip, port, community, oid, DEFAULT_TIMEOUT, DEFAULT_RETRIES);
     }
 
-    /**
-     * 可指定超时/重试次数的 GET。用于「快速二次探测」场景：主探测已超时的地址，
-     * 再用更短超时验证一次，避免整轮扫描时间成倍增长。
-     */
     public Map<String, String> get(String ip, int port, String community, String oid,
                                    int timeoutMs, int retries) {
         Map<String, String> result = new HashMap<>();
@@ -182,7 +186,6 @@ public class SnmpClient {
         return getCpuUsage(ip, port, community, null);
     }
 
-    /** preferredCpuOid 优先尝试（来自 OID 模板），再回退内置链 */
     public Double getCpuUsage(String ip, int port, String community, String preferredCpuOid) {
         java.util.LinkedHashSet<String> cpuOids = new java.util.LinkedHashSet<>();
         if (preferredCpuOid != null && !preferredCpuOid.isBlank()) {
@@ -824,10 +827,6 @@ public class SnmpClient {
         return arpTable;
     }
 
-    /**
-     * 采集设备本机全部 IP（ipAddrTable），用于把 Trap 接口地址映射到纳管管理 IP。
-     * OID: 1.3.6.1.2.1.4.20.1.1 (ipAdEntAddr)
-     */
     public List<String> getIpAddrTable(String ip, int port, String community) {
         List<String> ips = new ArrayList<>();
         try {
@@ -840,7 +839,7 @@ public class SnmpClient {
                         continue;
                     }
                     String cleaned = value.trim();
-                    // 有的实现返回 IpAddress 文本，有的把地址编进 OID 末尾
+                    // 有的实现返回IpAddress文本，有的把地址编进OID末尾
                     if (!isLikelyIpv4(cleaned)) {
                         String[] oidParts = entry.getKey().split("\\.");
                         if (oidParts.length >= 4) {

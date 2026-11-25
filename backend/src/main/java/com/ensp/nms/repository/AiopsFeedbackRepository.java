@@ -8,6 +8,15 @@ import org.springframework.stereotype.Repository;
 
 import java.util.List;
 
+/**
+ * 智能运维结论反馈数据访问仓库：封装对应实体的持久化查询与写入。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15
+ */
+
 @Repository
 public interface AiopsFeedbackRepository extends JpaRepository<AiopsFeedback, Long> {
     List<AiopsFeedback> findTop50ByOrderByCreatedAtDesc();

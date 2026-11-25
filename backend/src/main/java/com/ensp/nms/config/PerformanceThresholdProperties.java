@@ -5,8 +5,13 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 
 /**
- * 性能阈值（全局默认），可通过 application.yml / 环境变量覆盖。
- */
+ * 性能阈值，可通过application.yml或环境变量覆盖。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15 */
+
 @Data
 @Component
 @ConfigurationProperties(prefix = "nms.performance.thresholds")
@@ -17,9 +22,7 @@ public class PerformanceThresholdProperties {
 
     @Data
     public static class MetricThreshold {
-        /** warning 级别下限 */
         private double warning = 70.0;
-        /** danger 级别下限 */
         private double danger = 85.0;
 
         public MetricThreshold() {

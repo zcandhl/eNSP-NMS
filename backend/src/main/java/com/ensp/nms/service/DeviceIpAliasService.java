@@ -16,8 +16,13 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * 维护「接口 IP → 纳管设备」映射。Trap 常带 Vlanif/业务口地址，而非管理环回。
- */
+ * 维护接口IP到纳管设备的映射，Trap常带Vlanif/业务口地址。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15 */
+
 @Slf4j
 @Service
 public class DeviceIpAliasService {
@@ -31,7 +36,6 @@ public class DeviceIpAliasService {
     @Autowired
     private SnmpClient snmpClient;
 
-    /** 避免告警列表批量 enrich 时对同一批接口 IP 反复 SNMP 扫描 */
     private volatile long lastFullRefreshMs = 0;
     private static final long FULL_REFRESH_COOLDOWN_MS = 60_000;
 
@@ -48,10 +52,6 @@ public class DeviceIpAliasService {
                 .flatMap(a -> deviceRepository.findById(a.getDeviceId()));
     }
 
-    /**
-     * 别名表未命中时：对各设备做一次 ipAddrTable 刷新，再按目标 IP 查找。
-     * 60 秒内只全量刷新一次，避免告警列表批量纠正时反复扫网。
-     */
     @Transactional
     public Optional<Device> resolveByRefreshingAliases(String rawIp) {
         String ip = AlarmService.normalizeDeviceIp(rawIp);
@@ -107,14 +107,14 @@ public class DeviceIpAliasService {
             }
         }
 
-        // 先清本设备旧别名，再写入（管理 IP 不进别名表，避免与 device.ip 重复）
+        // 先清本设备旧别名，再写入
         aliasRepository.deleteAllByDeviceId(device.getId());
         aliasRepository.flush();
         for (String aliasIp : ips) {
             if (aliasIp.equals(mgmtIp)) {
                 continue;
             }
-            // 该接口 IP 若已被其它设备占用，改归属到当前设备（以本次 SNMP 为准）
+            // 该接口IP若已被其它设备占用，改归属到当前设备
             Optional<DeviceIpAlias> existing = aliasRepository.findByIpAddress(aliasIp);
             if (existing.isPresent()) {
                 DeviceIpAlias row = existing.get();

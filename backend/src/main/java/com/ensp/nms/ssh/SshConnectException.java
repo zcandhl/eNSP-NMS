@@ -1,10 +1,13 @@
 package com.ensp.nms.ssh;
 
 /**
- * SSH 连接失败（网络/端口/协商/认证层面）。
- * <p>消息为面向运维人员的中文描述，可直接展示在前端提示与审计日志里；
- * 原始 JSch 异常通过 cause 保留，日志打印时仍可回溯底层堆栈。</p>
- */
+ * SSH 连接异常，携带主机与端口信息。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-11-22 */
+
 public class SshConnectException extends RuntimeException {
 
     private final String host;

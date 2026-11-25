@@ -24,6 +24,14 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+/**
+ * 角色维护、预置角色保护与关联用户统计。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15 */
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -90,7 +98,6 @@ public class RoleService {
                 .build();
     }
 
-    /** 兼容旧调用：仅建角色不赋权 */
     @Transactional
     public Role createRole(Role role) {
         return createRoleEntity(role);
@@ -174,7 +181,6 @@ public class RoleService {
                 .build();
     }
 
-    /** 兼容旧接口 */
     @Transactional
     public Role updateRole(Long id, Role roleDetails) {
         RoleUpdateRequest req = new RoleUpdateRequest();

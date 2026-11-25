@@ -25,8 +25,13 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
- * 配置恢复/批量下发异步任务：内存实时进度 + DB 持久化（重启可查，约 7 天）。
- */
+ * 配置恢复/批量下发异步任务：内存实时进度与DB持久化。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15 */
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -118,10 +123,6 @@ public class ConfigTaskService {
         return submitBatchApply(deviceIds, content, enableVariables, parallel, reason, 0, null);
     }
 
-    /**
-     * @param waveSize 首波设备数；0 表示一次全部；&gt;0 时首波完成后进入 PAUSED，可 continue
-     * @param resumeFromTaskId 继续任务时合并已有结果
-     */
     public ConfigTaskState submitBatchApply(List<Long> deviceIds, String content,
                                             boolean enableVariables, boolean parallel, String reason,
                                             int waveSize, String resumeFromTaskId) {
@@ -166,7 +167,6 @@ public class ConfigTaskService {
         return task;
     }
 
-    /** 变量集批量下发：每组变量渲染一段配置，段 × 设备 逐对下发（同一设备可收多段不同配置） */
     public ConfigTaskState submitBatchVariableSets(List<Long> deviceIds, String content,
                                                    List<Map<String, String>> variableSets,
                                                    boolean parallel, String reason) {
@@ -371,7 +371,6 @@ public class ConfigTaskService {
         recordTaskAudit(task, "batch_apply");
     }
 
-    /** 继续 PAUSED 的分波任务 */
     public ConfigTaskState continueBatch(String taskId, Integer nextWaveSize) {
         ConfigTaskState task = getTask(taskId)
                 .orElseThrow(() -> new IllegalArgumentException("任务不存在"));
@@ -389,7 +388,7 @@ public class ConfigTaskService {
         String reason = req.get("reason") != null ? req.get("reason").toString() : null;
         int wave = nextWaveSize != null && nextWaveSize > 0 ? nextWaveSize : pending.size();
 
-        // 在同一任务上继续，保留 id
+        // 在同一任务上继续，保留id
         task.setCancelRequested(false);
         task.setFinishedAt(null);
         task.setError(null);
@@ -414,7 +413,6 @@ public class ConfigTaskService {
         return task;
     }
 
-    /** 对失败设备重新提交新任务 */
     public ConfigTaskState retryFailed(String taskId) {
         ConfigTaskState prev = getTask(taskId)
                 .orElseThrow(() -> new IllegalArgumentException("任务不存在"));
@@ -539,7 +537,7 @@ public class ConfigTaskService {
         for (ConfigTask e : configTaskRepository.findByCreatedAtAfterOrderByCreatedAtDesc(after)) {
             merged.put(e.getId(), fromEntity(e));
         }
-        // 内存中的进行中任务覆盖 DB 快照
+        // 内存中的进行中任务覆盖DB快照
         for (ConfigTaskState t : tasks.values()) {
             merged.put(t.getId(), t);
         }

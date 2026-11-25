@@ -1,3 +1,13 @@
+/**
+ * @file    AcceptancePlanDesign.vue
+ * @module  视图页/验收
+ * @desc    验收计划设计与检查项编排页。
+ *
+ * @author  ZC
+ * @date    2026-11-22 * @version 1.0.0
+ * @requires @element-plus/icons-vue, element-plus, pinia, vue, vue-router, @/api/acceptance, @/stores/auth, @/stores/project
+ */
+
 <template>
   <div class="nms-page plan-design" v-loading="loading">
     <div class="nms-page-header">
@@ -180,7 +190,7 @@
             共 {{ checks.length }} 项 · 启用 {{ enabledCount }} 项
             <em v-if="planDetail">· {{ planLabel(planDetail) }}</em>
           </span>
-          <!-- 保存入口只在右上角和抽屉里各一个，这里只显示保存状态，避免按钮重复 -->
+          
           <span v-if="dirty" class="pd-save-state is-dirty">有未保存的修改</span>
           <span v-else-if="savedAt" class="pd-save-state">已于 {{ savedAtText }} 保存</span>
           <span v-else class="pd-save-state">尚未修改</span>
@@ -207,7 +217,7 @@
           <el-button :loading="dryRunning" @click="doDryRun">试运行该项</el-button>
           <div class="pd-drawer-foot-right">
             <el-button @click="drawerVisible = false">关闭</el-button>
-            <!-- 抽屉会盖住页面右上角的「保存方案」，这里必须有一个就地保存入口 -->
+            
             <el-button type="primary" :loading="saving" :disabled="!planDetail" @click="doSave()">
               保存
             </el-button>
@@ -270,7 +280,6 @@ const saving = ref(false)
 const dryRunning = ref(false)
 const creating = ref(false)
 
-/** 最近一次成功保存的时刻，用于底部状态栏显示 */
 const savedAt = ref(null)
 const savedAtText = computed(() => {
   const d = savedAt.value
@@ -304,7 +313,6 @@ const rawItem = ref(null)
 // 保存时的基线快照，用来判断"有未保存的修改"
 const snapshot = ref('')
 
-/** 检查项数组：直接用方案对象里的数组做编辑载体，保存时整体提交 */
 const checks = computed(() => planDetail.value?.checks || [])
 
 const enabledCount = computed(() => checks.value.filter((c) => c.enabled).length)
@@ -325,7 +333,6 @@ const selectedCheck = computed(
 
 const dirty = computed(() => !!planDetail.value && JSON.stringify(checks.value) !== snapshot.value)
 
-/** 方案名末尾已带版本号（如"…方案 V1.0"）时不再重复拼 v1.0 */
 const VER_TAIL = /\s*v?\d+(\.\d+){0,2}\s*$/i
 const nameHasVer = (p) => !!p && VER_TAIL.test(String(p.name || ''))
 const planLabel = (p) => (!p ? '' : nameHasVer(p) ? p.name : `${p.name} v${p.version}`)
@@ -335,7 +342,7 @@ const subtitle = computed(() => {
   if (!planDetail.value) return `${pname || '当前工程'} · 选择或新建一个验收方案`
   const parts = [pname, planLabel(planDetail.value)]
   parts.push(`${checks.value.length} 项 / 启用 ${enabledCount.value} 项`)
-  if (mockMode.value) parts.push('演示数据')
+  if (mockMode.value) parts.push('离线数据')
   if (dirty.value) parts.push('未保存')
   return parts.filter(Boolean).join(' · ')
 })
@@ -366,8 +373,6 @@ function enabledOf(plan) {
   return (plan.checks || []).filter((c) => c.enabled).length
 }
 
-// ────────────────────────── 加载 ──────────────────────────
-
 async function loadProjects() {
   await projectStore.load(true)
   if (projectId.value && projects.value.some((p) => p.id === projectId.value)) return
@@ -396,7 +401,7 @@ async function loadPlanDetail(id) {
     return
   }
   const plan = await acceptanceApi.getPlan(id)
-  // 兜底：后端历史数据可能缺 id/seq，前端补上，避免表格 row-key 冲突
+  // 兜底：后端历史数据可能缺id/seq，前端补上，避免表格row-key冲突
   let seq = 0
   ;(plan.checks || []).forEach((c) => {
     seq += 1
@@ -478,8 +483,6 @@ async function loadMeta() {
   }
 }
 
-// ────────────────────────── 编辑 ──────────────────────────
-
 function openDrawer(row) {
   selectedCheckId.value = row.id
   drawerVisible.value = true
@@ -555,8 +558,6 @@ function setEnabled(v) {
   ElMessage.success(`已${v ? '启用' : '停用'} ${selection.value.length} 项，保存后生效`)
 }
 
-// ────────────────────────── 保存 / 新建 / 删除 ──────────────────────────
-
 async function doSave(silent = false) {
   if (!planDetail.value) return false
   if (!enabledCount.value) {
@@ -573,7 +574,7 @@ async function doSave(silent = false) {
     savedAt.value = new Date()
     plans.value = await acceptanceApi.listPlans(projectId.value)
     if (!silent) {
-      ElMessage.success(mockMode.value ? '已保存（演示模式，仅前端内存）' : '方案已保存')
+      ElMessage.success(mockMode.value ? '已保存（离线模式，仅前端内存）' : '方案已保存')
     }
     return true
   } catch (e) {
@@ -670,7 +671,6 @@ onMounted(async () => {
   width: 220px;
 }
 
-/* 页面撑满可视区：面板延伸到底部，避免下方大片页底色留白 */
 .plan-design {
   height: calc(100vh - 96px);
   min-height: 560px;
@@ -685,7 +685,6 @@ onMounted(async () => {
   align-items: stretch;
 }
 
-/* 左：方案列表 */
 .pd-plans {
   flex: 0 0 auto;
   width: 300px;
@@ -776,7 +775,6 @@ onMounted(async () => {
   border-top: 1px solid var(--nms-border-soft);
 }
 
-/* 右：检查项表格 */
 .pd-main {
   flex: 1;
   min-width: 0;
@@ -795,7 +793,6 @@ onMounted(async () => {
   color: var(--nms-warning);
 }
 
-/* 表格撑满面板剩余高度，表头固定、正文区内部滚动 */
 .pd-table {
   width: 100%;
   flex: 1;
@@ -812,7 +809,6 @@ onMounted(async () => {
   overflow-y: auto;
 }
 
-/* 字号整体放大一档：表头 14px、正文 14px */
 .pd-table :deep(.el-table__header th) {
   font-size: 14px;
   font-weight: 600;
@@ -888,7 +884,7 @@ onMounted(async () => {
   align-items: center;
   gap: 4px;
 
-  /* 原生按钮 28×28：el-button 自带内边距会把 3 个图标撑出列宽，导致删除被截断 */
+  
   .op-btn {
     width: 28px;
     height: 28px;
@@ -935,7 +931,7 @@ onMounted(async () => {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  /* 右侧给运维助手悬浮球让位（球固定在右下角，48px 宽 + 24px 边距） */
+  
   padding-right: 92px;
 }
 

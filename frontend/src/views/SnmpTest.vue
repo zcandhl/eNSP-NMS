@@ -1,3 +1,14 @@
+/**
+ * @file    SnmpTest.vue
+ * @module  视图页/设备
+ * @desc    SNMP 参数连通性测试页。
+ *
+ * @author  ZC
+ * @date    2026-08-15
+ * @version 1.0.0
+ * @requires element-plus, vue, @/api/index
+ */
+
 <template>
   <div class="snmp-test">
     <el-card>

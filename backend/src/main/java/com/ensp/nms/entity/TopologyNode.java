@@ -6,6 +6,15 @@ import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.LocalDateTime;
 
+/**
+ * 拓扑节点实体，保存设备在拓扑中的位置与状态。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15
+ */
+
 @Data
 @Entity
 @Table(name = "topology_node")

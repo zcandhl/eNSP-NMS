@@ -1,9 +1,15 @@
+/**
+ * @file    pageOpsBus.js
+ * @module  组合式逻辑
+ * @desc    页面级运维操作事件总线。
+ *
+ * @author  ZC
+ * @date    2026-08-15 * @version 1.0.0
+ * @requires vue
+ */
+
 import { reactive, readonly } from 'vue'
 
-/**
- * 业务页 PageContext + ToolResultSink。
- * 助手/工具执行后通过 publishToolResult 回灌当前页；页面用 onToolResult / watch sinkToken 消费。
- */
 const pageContext = reactive({
   page: '',
   deviceId: null,
@@ -48,10 +54,6 @@ export function clearPageContext() {
   pageContext.updatedAt = Date.now()
 }
 
-/**
- * @param {object} result executeTool / assist 工具结果
- * @param {{ source?: string, tool?: string }} meta
- */
 export function publishToolResult(result, meta = {}) {
   if (!result || result.cancelled) return
   sink.last = {

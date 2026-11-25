@@ -1,3 +1,13 @@
+/**
+ * @file    Login.vue
+ * @module  视图页/登录
+ * @desc    登录页：账号认证与登录状态跳转。
+ *
+ * @author  ZC
+ * @date    2026-08-15 * @version 1.0.0
+ * @requires @element-plus/icons-vue, element-plus, vue, vue-router, @/components/BrandLogo, @/components/ThemePicker, @/stores/auth
+ */
+
 <template>
   <div class="login-page">
     <div class="login-bg" aria-hidden="true">
@@ -13,50 +23,38 @@
     <div class="login-layout">
       <aside class="login-hero">
         <div class="hero-brand">
-          <div class="hero-mark">N</div>
+          <span class="hero-mark"><BrandLogo :size="40" /></span>
           <div>
-            <div class="hero-name">eNSP NMS</div>
-            <div class="hero-tag">Enterprise Network Manager</div>
+            <div class="hero-name">预验通</div>
+            <div class="hero-tag">园区网工程预实施验证系统</div>
           </div>
         </div>
-        <h2 class="hero-title">实验室网络运维<br />一站式管理平台</h2>
-        <ul class="hero-points">
-          <li>设备发现 · 状态探测 · 分组资产</li>
-          <li>SNMP 性能 · Trap 告警 · 拓扑可视</li>
-          <li>配置备份 · WebSSH · 智能运维</li>
-        </ul>
-        <p class="hero-foot">面向 eNSP 实验环境的教学网管产品</p>
-        <div v-if="license" class="hero-license">
-          <div>{{ license.customer || '授权客户未配置' }}</div>
-          <div class="hero-license-meta">
-            {{ license.sku || '教学标准版' }}
-            <template v-if="license.expires"> · 授权至 {{ license.expires }}</template>
+        <div class="hero-main">
+          <h2 class="hero-title">开工之前，<br />先通一遍。</h2>
+          <p class="hero-sub">验证一次 · 复用到底</p>
+        </div>
+        <div class="hero-feats">
+          <div class="feat">
+            <span class="feat-ico"><el-icon><Connection /></el-icon></span>
+            <span>设备纳管 · 拓扑自动上图</span>
+          </div>
+          <div class="feat">
+            <span class="feat-ico"><el-icon><Finished /></el-icon></span>
+            <span>检查项逐项判定 · 结果可复检</span>
+          </div>
+          <div class="feat">
+            <span class="feat-ico"><el-icon><Document /></el-icon></span>
+            <span>验收报告一键生成 · 留痕取证</span>
           </div>
         </div>
+        <div class="hero-wm" aria-hidden="true"><BrandLogo :size="170" /></div>
       </aside>
 
       <div class="login-card">
         <div class="card-head">
           <h1>{{ forceChange ? '首次登录改密' : '登录系统' }}</h1>
-          <p>{{ forceChange ? '默认口令须立即更换后方可进入系统' : '使用运维账号进入网络管理系统' }}</p>
+          <p>{{ forceChange ? '默认口令须立即更换后方可进入系统' : '使用运维账号进入预实施验证平台' }}</p>
         </div>
-        <el-alert
-          v-if="license?.expired === true"
-          type="error"
-          :closable="false"
-          show-icon
-          class="license-alert"
-          title="授权已到期，请联系供应商续期（课堂功能仍可登录使用）"
-        />
-        <el-alert
-          v-else-if="licenseNearExpiry"
-          type="warning"
-          :closable="false"
-          show-icon
-          class="license-alert"
-          :title="`授权将在 ${license.daysRemaining} 天后到期，请联系供应商续期`"
-        />
-
         <el-form v-if="!forceChange" ref="formRef" :model="form" :rules="rules" @keyup.enter="onSubmit">
           <el-form-item prop="username">
             <el-input v-model="form.username" placeholder="用户名" prefix-icon="User" size="large" />
@@ -94,36 +92,30 @@
             保存并进入
           </el-button>
         </el-form>
-
-        <p v-if="!forceChange" class="hint">默认账号：admin / Admin@123（首次登录须改密）</p>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { reactive, ref, computed, onMounted } from 'vue'
+import { reactive, ref, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
-import { useLicenseInfo } from '@/composables/useLicenseInfo'
 import ThemePicker from '@/components/ThemePicker.vue'
+import BrandLogo from '@/components/BrandLogo.vue'
+import { Connection, Finished, Document } from '@element-plus/icons-vue'
 
 const router = useRouter()
 const route = useRoute()
 const auth = useAuthStore()
-const { info: license, load: loadLicense } = useLicenseInfo()
 
 const formRef = ref(null)
 const pwdRef = ref(null)
 const loading = ref(false)
 const forceChange = ref(false)
-const licenseNearExpiry = computed(() => {
-  const d = license.value?.daysRemaining
-  return license.value?.expired === false && typeof d === 'number' && d >= 0 && d <= 30
-})
 const form = reactive({
-  username: 'admin',
+  username: '',
   password: ''
 })
 const pwdForm = reactive({
@@ -160,7 +152,6 @@ const pwdRules = {
 }
 
 onMounted(() => {
-  loadLicense()
   try {
     const hint = sessionStorage.getItem('ensp_nms_login_hint')
     if (hint) {
@@ -223,13 +214,45 @@ const onChangePassword = async () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--nms-bg, #f0f3f8);
+  background:
+    radial-gradient(1100px 700px at 12% -8%, rgba(63, 140, 255, 0.16), transparent 60%),
+    radial-gradient(900px 600px at 105% 110%, rgba(34, 197, 220, 0.14), transparent 55%),
+    linear-gradient(180deg, #eef3fa 0%, #e7edf6 100%);
 }
 .login-bg {
   position: absolute;
   inset: 0;
   overflow: hidden;
   pointer-events: none;
+}
+.login-bg .grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(31, 74, 120, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(31, 74, 120, 0.05) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: radial-gradient(720px 520px at 50% 45%, rgba(0, 0, 0, 0.8), transparent 75%);
+  -webkit-mask-image: radial-gradient(720px 520px at 50% 45%, rgba(0, 0, 0, 0.8), transparent 75%);
+}
+.login-bg .orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(70px);
+}
+.login-bg .orb-a {
+  width: 420px;
+  height: 420px;
+  left: -120px;
+  top: -140px;
+  background: rgba(63, 140, 255, 0.2);
+}
+.login-bg .orb-b {
+  width: 380px;
+  height: 380px;
+  right: -100px;
+  bottom: -120px;
+  background: rgba(45, 183, 220, 0.18);
 }
 .login-top {
   position: absolute;
@@ -249,63 +272,114 @@ const onChangePassword = async () => {
   box-shadow: 0 20px 60px rgba(15, 35, 60, 0.12);
 }
 .login-hero {
-  padding: 40px 36px;
-  background: linear-gradient(145deg, #1a3a5c 0%, #0f2740 100%);
+  padding: 44px 40px;
+  background: linear-gradient(
+    150deg,
+    color-mix(in srgb, var(--el-color-primary) 55%, #071626) 0%,
+    color-mix(in srgb, var(--el-color-primary) 22%, #071626) 62%,
+#071626 100%
+  );
   color: #fff;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+  min-height: 470px;
+}
+.login-hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px);
+  background-size: 22px 22px;
+  mask-image: linear-gradient(160deg, rgba(0, 0, 0, 0.9), transparent 68%);
+  pointer-events: none;
 }
 .hero-brand {
   display: flex;
   gap: 12px;
   align-items: center;
-  margin-bottom: 28px;
+  position: relative;
+  z-index: 1;
+  margin-bottom: 44px;
 }
 .hero-mark {
-  width: 40px;
-  height: 40px;
-  border-radius: 10px;
-  background: #3d8bfd;
+  color: var(--el-color-primary);
+  display: flex;
+  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.25));
+}
+.hero-name { font-weight: 700; font-size: 19px; letter-spacing: 1px; }
+.hero-tag { font-size: 12px; opacity: 0.7; margin-top: 3px; letter-spacing: 1px; }
+.hero-main {
+  margin: auto 0;
+  position: relative;
+  z-index: 1;
+}
+.hero-title {
+  font-size: 30px;
+  line-height: 1.5;
+  margin: 0 0 18px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+}
+.hero-sub {
+  margin: 0;
+  font-size: 14px;
+  opacity: 0.75;
+  letter-spacing: 2px;
   display: flex;
   align-items: center;
-  justify-content: center;
-  font-weight: 700;
+  gap: 10px;
 }
-.hero-name { font-weight: 700; font-size: 16px; }
-.hero-tag { font-size: 12px; opacity: 0.7; }
-.hero-title {
-  font-size: 28px;
-  line-height: 1.35;
-  margin: 0 0 20px;
-  font-weight: 650;
+.hero-sub::before {
+  content: '';
+  width: 26px;
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.45);
+  flex-shrink: 0;
 }
-.hero-points {
-  margin: 0;
-  padding-left: 18px;
-  line-height: 1.9;
-  opacity: 0.9;
-  font-size: 14px;
+.hero-feats {
+  position: relative;
+  z-index: 1;
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-top: 4px;
+  margin-bottom: auto;
 }
-.hero-foot {
-  margin-top: 28px;
-  font-size: 12px;
-  opacity: 0.55;
-}
-.hero-license {
-  margin-top: 16px;
-  padding-top: 14px;
-  border-top: 1px solid rgba(255, 255, 255, 0.15);
+.feat {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 14px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.13);
   font-size: 13px;
-  opacity: 0.85;
+  letter-spacing: 0.5px;
 }
-.hero-license-meta {
-  margin-top: 4px;
-  font-size: 12px;
-  opacity: 0.7;
+.feat-ico {
+  display: flex;
+  color: var(--el-color-primary-light-3);
+  font-size: 16px;
 }
-.license-alert {
-  margin-bottom: 16px;
+.hero-wm {
+  position: absolute;
+  right: -30px;
+  bottom: -36px;
+  color: var(--el-color-primary);
+  opacity: 0.16;
+  pointer-events: none;
+  mask-image: linear-gradient(315deg, rgba(0, 0, 0, 0.9) 25%, transparent 68%);
+  -webkit-mask-image: linear-gradient(315deg, rgba(0, 0, 0, 0.9) 25%, transparent 68%);
 }
 .login-card {
   padding: 40px 36px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 .card-head h1 {
   margin: 0 0 6px;
@@ -319,12 +393,6 @@ const onChangePassword = async () => {
 .submit-btn {
   width: 100%;
   margin-top: 8px;
-}
-.hint {
-  margin-top: 16px;
-  font-size: 12px;
-  color: #909399;
-  text-align: center;
 }
 .pwd-alert {
   margin-bottom: 16px;

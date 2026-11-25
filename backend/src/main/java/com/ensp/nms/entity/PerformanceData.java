@@ -4,6 +4,14 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
+/**
+ * 性能指标实体，保存 CPU、内存与端口时序数据。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15 */
+
 @Entity
 @Table(name = "performance_data")
 public class PerformanceData {
@@ -71,18 +79,12 @@ public class PerformanceData {
     @Column(name = "port_discards_out")
     private Long portDiscardsOut;
 
-    /** ifOperStatus: up / down / unknown（来自 SNMP，非流量启发式） */
     @Column(name = "port_oper_status", length = 20)
     private String portOperStatus;
 
-    /**
-     * CPU 指标来源：snmp=真采，simulated=仿真回退，unknown=未标注（历史数据）。
-     * AIOps 基线/阈值告警应优先忽略 simulated。
-     */
     @Column(name = "cpu_source", length = 20)
     private String cpuSource;
 
-    /** 内存指标来源：snmp / simulated / unknown */
     @Column(name = "memory_source", length = 20)
     private String memorySource;
 
@@ -114,7 +116,7 @@ public class PerformanceData {
         this.device = device;
     }
 
-    // 暴露 deviceId 用于 JSON 序列化（device 字段本身被 @JsonIgnore）
+    // 暴露deviceId用于JSON序列化
     public Long getDeviceId() {
         return device != null ? device.getId() : null;
     }
@@ -287,7 +289,6 @@ public class PerformanceData {
         this.memorySource = memorySource;
     }
 
-    /** 综合来源：两端均为 snmp → snmp；任一仿真 → mixed/simulated */
     public String getMetricSourceSummary() {
         boolean cpuSim = SOURCE_SIMULATED.equalsIgnoreCase(cpuSource);
         boolean memSim = SOURCE_SIMULATED.equalsIgnoreCase(memorySource);

@@ -1,9 +1,12 @@
 /**
- * 页面可见时运行轮询，切到后台标签页时暂停。
- * @param {() => void | Promise<void>} tick
- * @param {number} intervalMs
- * @returns {{ start: () => void, stop: () => void }}
+ * @file    useVisibilityPoller.js
+ * @module  组合式逻辑
+ * @desc    页面可见性感知的轮询定时器。
+ *
+ * @author  ZC
+ * @date    2026-08-15 * @version 1.0.0
  */
+
 export function createVisibilityPoller(tick, intervalMs) {
   let timerId = null
   let running = false

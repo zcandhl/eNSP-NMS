@@ -1,6 +1,12 @@
 /**
- * 最近一次智能巡检报告（本页展示用，不推运维助手）。
+ * @file    inspectReportStore.js
+ * @module  组合式逻辑
+ * @desc    巡检报告本地暂存与读取。
+ *
+ * @author  ZC
+ * @date    2026-08-15 * @version 1.0.0
  */
+
 const KEY = 'ensp_last_inspect_report'
 
 export function saveInspectReport(res) {
@@ -16,7 +22,7 @@ export function saveInspectReport(res) {
   }
   try {
     sessionStorage.setItem(KEY, JSON.stringify(payload))
-  } catch { /* ignore quota */ }
+  } catch {  }
   return payload
 }
 

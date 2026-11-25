@@ -8,13 +8,21 @@ import java.time.LocalDateTime;
         @Index(name = "idx_unattended_run_started", columnList = "started_at"),
         @Index(name = "idx_unattended_run_alarm", columnList = "alarm_id")
 })
+
+/**
+ * 无人值守执行记录实体，对应一次自动化处置流程。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15 */
+
 public class AiopsUnattendedRun {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    /** inspect / correlate / api / focus / retry */
     @Column(length = 40)
     private String triggerSource;
 
@@ -24,11 +32,9 @@ public class AiopsUnattendedRun {
     @Column(name = "device_id")
     private Long deviceId;
 
-    /** llm / rules / breaker */
     @Column(length = 20, nullable = false)
     private String planSource = "rules";
 
-    /** running / success / failed / skipped */
     @Column(length = 20, nullable = false)
     private String status = "running";
 

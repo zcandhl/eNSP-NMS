@@ -1,3 +1,13 @@
+/**
+ * @file    HeaderProjectSwitcher.vue
+ * @module  通用组件
+ * @desc    顶栏验收项目切换组件。
+ *
+ * @author  ZC
+ * @date    2026-11-22 * @version 1.0.0
+ * @requires @element-plus/icons-vue, element-plus, pinia, vue, vue-router, @/stores/project
+ */
+
 <template>
   <el-dropdown trigger="click" placement="bottom-end" @command="onCommand">
     <button type="button" class="ps-btn" :class="{ empty: !current }" title="当前工程：设备、告警、性能、拓扑、验收均按此工程过滤">
@@ -53,7 +63,7 @@ import { OfficeBuilding, ArrowDown, Check, Setting, Plus } from '@element-plus/i
 import { useProjectStore } from '@/stores/project'
 
 // 顶栏工程上下文：不仅"选一个工程"，还带工程规模摘要与工程管理入口。
-// 切换后各模块（设备/告警/性能/拓扑/验收）监听 store.projectId 自行刷新。
+// 切换后各模块监听store.projectId自行刷新。
 const router = useRouter()
 const store = useProjectStore()
 const { projects, projectId, current } = storeToRefs(store)

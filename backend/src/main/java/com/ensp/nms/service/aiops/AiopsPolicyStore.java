@@ -12,8 +12,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * AIOps 策略单行持久化：启动时加载到内存 Properties，PUT 时写库并同步内存。
- */
+ * AIOps策略单行持久化：启动时加载到内存Properties，PUT时写库并同步内存。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15 */
+
 @Slf4j
 @Service
 @RequiredArgsConstructor

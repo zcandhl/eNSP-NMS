@@ -6,14 +6,20 @@ import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
 
-/**
- * 设备接口/环回等非纳管主 IP，用于 Trap agent 地址回映射到管理 IP。
- */
 @Data
 @Entity
 @Table(name = "device_ip_alias",
         uniqueConstraints = @UniqueConstraint(name = "uk_device_ip_alias_ip", columnNames = "ip_address"),
         indexes = @Index(name = "idx_device_ip_alias_device", columnList = "device_id"))
+
+/**
+ * 设备 IP 别名实体，映射管理地址与业务接口地址。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15 */
+
 public class DeviceIpAlias {
 
     @Id

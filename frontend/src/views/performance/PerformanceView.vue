@@ -1,3 +1,13 @@
+/**
+ * @file    PerformanceView.vue
+ * @module  视图页/性能
+ * @desc    性能指标监控与趋势页。
+ *
+ * @author  ZC
+ * @date    2026-08-15 * @version 1.0.0
+ * @requires @element-plus/icons-vue, echarts, element-plus, pinia, vue, vue-router, @/api/device, @/components/ops-assistant/OpsInlineShell, @/composables/askOpsAssistant, @/composables/pageOpsBus, @/composables/useOpsInlinePanel, @/composables/useThemeColors, @/composables/useVisibilityPoller, @/stores/auth, @/stores/project, @/stores/theme, @/utils/deviceCapabilities
+ */
+
 <template>
   <div class="nms-page performance-view">
     <div class="nms-page-header">
@@ -38,7 +48,7 @@
       <div class="nms-panel-body">
       <div class="perf-work-split">
       <div class="perf-work-main">
-      <!-- 提示信息 -->
+      
       <el-empty v-if="devices.length === 0" description="暂无设备，请先添加设备" style="padding: 60px 0;" />
       <el-empty
         v-else-if="performanceDevices.length === 0"
@@ -448,7 +458,6 @@ const primaryColor = () => readThemePrimary()
 const themeStore = useThemeStore()
 const { revision: themeRevision } = storeToRefs(themeStore)
 
-/** 正常态用主题主色；告警阈值仍用语义橙/红 */
 const cpuColor = computed(() => {
   void themeRevision.value
   const val = cpuUsage.value
@@ -532,7 +541,7 @@ watch(
 
 const loadDevices = async () => {
   try {
-    // 全局工程上下文：只展示当前工程下可采集设备（未选工程时显示全部）
+    // 全局工程上下文：只展示当前工程下可采集设备
     const all = await deviceApi.getDevices()
     devices.value = projectStore.projectId
       ? all.filter(d => d.projectId === projectStore.projectId)
@@ -920,7 +929,6 @@ onUnmounted(() => {
   if (tempChart) tempChart.dispose()
 })
 
-/** 助手工具结果回写本页 */
 watch(
   () => pageSink.token,
   async (token) => {
@@ -969,7 +977,7 @@ watch(
 }
 
 .perf-work-side {
-  /* OpsInlineShell */
+  
 }
 
 @media (max-width: 1100px) {
@@ -1262,7 +1270,7 @@ watch(
 }
 
 .perf-table {
-  --el-table-border-color: var(--nms-border-soft);
+--el-table-border-color: var(--nms-border-soft);
   font-size: 13px;
 }
 
@@ -1375,7 +1383,6 @@ watch(
   height: 300px;
 }
 
-/* 端口 up 状态跟随主题主色（覆盖全局成功绿） */
 .theme-port.is-online {
   color: var(--nms-primary);
 }

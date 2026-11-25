@@ -13,8 +13,13 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 验收方案 CRUD：方案即数据。检查项列表整体以 JSON 存库，改方案不改代码。
- */
+ * 验收计划增删改查、检查项解析与视图转换。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-11-22 */
+
 @Service
 @RequiredArgsConstructor
 public class AcceptancePlanService {
@@ -35,13 +40,6 @@ public class AcceptancePlanService {
         return planRepository.findById(id);
     }
 
-    /**
-     * 新建方案。
-     *
-     * @param payload projectId 必填；name/version/reportNoRule 可选；
-     *                template=true（默认）时带标准六项检查模板，owner 绑定当前登录账号
-     * @param owner   当前登录账号 username（检查项负责人初始值；可被 payload.owner 覆盖）
-     */
     @SuppressWarnings("unchecked")
     public AcceptancePlan create(Map<String, Object> payload, String owner) {
         Object projectIdObj = payload.get("projectId");
@@ -69,7 +67,6 @@ public class AcceptancePlanService {
         return planRepository.save(plan);
     }
 
-    /** 删除方案并连带清掉它的历史批次（快照随方案一起失效） */
     @Transactional
     public void delete(Long id) {
         AcceptancePlan plan = planRepository.findById(id)
@@ -78,10 +75,6 @@ public class AcceptancePlanService {
         planRepository.delete(plan);
     }
 
-    /**
-     * 实体 → 前端视图：checksJson 解析为 checks 数组。
-     * 前端契约直接读写 checks，不感知存储细节；解析失败按空数组处理，不让页面白屏。
-     */
     public Map<String, Object> toView(AcceptancePlan plan) {
         Map<String, Object> m = objectMapper.convertValue(plan, new TypeReference<Map<String, Object>>() {});
         m.remove("checksJson");
@@ -89,7 +82,6 @@ public class AcceptancePlanService {
         return m;
     }
 
-    /** checksJson → List；容错：空/坏 JSON 返回空列表 */
     public List<Map<String, Object>> parseChecks(String json) {
         if (json == null || json.isBlank()) {
             return List.of();
@@ -101,7 +93,6 @@ public class AcceptancePlanService {
         }
     }
 
-    /** 保存：name / status / reportNoRule / checks 均可改，checks 序列化为 JSON */
     @SuppressWarnings("unchecked")
     public AcceptancePlan save(Long id, Map<String, Object> payload) {
         AcceptancePlan plan = planRepository.findById(id)

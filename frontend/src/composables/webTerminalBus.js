@@ -1,14 +1,20 @@
+/**
+ * @file    webTerminalBus.js
+ * @module  组合式逻辑
+ * @desc    Web 终端跨组件通信总线。
+ *
+ * @author  ZC
+ * @date    2026-08-15 * @version 1.0.0
+ * @requires vue
+ */
+
 import { reactive } from 'vue'
 
-/**
- * 全局 Web 终端浮窗总线：导航栏 / 拓扑右键 / 其它页可打开同一可拖动终端。
- * 与运维助手解耦：终端只负责 SSH，不做 LLM 联动。
- */
 const state = reactive({
   open: false,
   deviceId: null,
   deviceName: '',
-  /** 递增以强制重新挂载终端会话 */
+  
   sessionKey: 0
 })
 

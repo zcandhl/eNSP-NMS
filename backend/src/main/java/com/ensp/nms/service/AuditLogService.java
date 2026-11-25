@@ -22,6 +22,15 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * 审计记录写入、查询、客户端 IP 提取与过期清理。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15
+ */
+
 @Slf4j
 @Service
 @RequiredArgsConstructor

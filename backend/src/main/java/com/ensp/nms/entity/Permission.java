@@ -7,6 +7,15 @@ import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
 
+/**
+ * 权限实体，定义操作权限编码与所属分组。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15
+ */
+
 @Data
 @Entity
 @Table(name = "app_permission")

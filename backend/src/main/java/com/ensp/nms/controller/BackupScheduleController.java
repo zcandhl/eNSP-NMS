@@ -12,6 +12,14 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * 配置备份计划与分组策略的查询、维护与立即执行接口。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15 */
+
 @RestController
 @RequestMapping("/api/backup-schedules")
 @RequiredArgsConstructor
@@ -46,7 +54,6 @@ public class BackupScheduleController {
         return ResponseEntity.ok(saved);
     }
 
-    /** 备份策略：为多台设备批量创建相同周期的定时备份 */
     @PostMapping("/policy")
     public ResponseEntity<?> createPolicy(@RequestBody Map<String, Object> body) {
         try {
@@ -85,7 +92,6 @@ public class BackupScheduleController {
         }
     }
 
-    /** 同步分组备份计划：按当前成员补齐/更新，可选清理离组成员计划 */
     @PostMapping("/sync-group")
     public ResponseEntity<?> syncGroupPolicy(@RequestBody Map<String, Object> body) {
         try {

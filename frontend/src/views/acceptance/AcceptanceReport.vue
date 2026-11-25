@@ -1,3 +1,13 @@
+/**
+ * @file    AcceptanceReport.vue
+ * @module  视图页/验收
+ * @desc    验收报告查看与导出页。
+ *
+ * @author  ZC
+ * @date    2026-11-22 * @version 1.0.0
+ * @requires @element-plus/icons-vue, element-plus, pinia, vue, vue-router, @/api/acceptance, @/stores/project
+ */
+
 <template>
   <div class="nms-page report-page" v-loading="loading">
     <div class="nms-page-header">
@@ -19,7 +29,7 @@
     </div>
 
     <div class="rp-grid">
-      <!-- 左：批次档案 -->
+      
       <aside class="rp-list nms-panel">
         <div class="rp-list-head">
           <span class="rl-title">批次档案</span>
@@ -60,7 +70,7 @@
         </div>
       </aside>
 
-      <!-- 右：报告预览 -->
+      
       <main class="rp-main">
         <div v-if="!current" class="rp-blank nms-panel">
           <el-empty description="左侧选择一个批次，这里显示报告预览" :image-size="72" />
@@ -93,7 +103,7 @@
 
           <div class="rp-scroll" ref="scrollEl">
             <article class="rp-paper">
-              <!-- 封面 -->
+              
               <header class="paper-cover">
                 <div class="pc-org">{{ project?.owner || '验收工程' }}</div>
                 <h2 class="pc-title">{{ project?.name || '网络工程' }}</h2>
@@ -117,7 +127,7 @@
                 </div>
               </div>
 
-              <!-- 一、验收依据 -->
+              
               <section :id="'sec-basis'" class="paper-sec">
                 <h3 class="ps-h1">一、验收依据</h3>
                 <ul class="ps-list">
@@ -125,7 +135,7 @@
                 </ul>
               </section>
 
-              <!-- 二、工程概况 -->
+              
               <section id="sec-overview" class="paper-sec">
                 <h3 class="ps-h1">二、工程概况</h3>
                 <table class="ps-kv">
@@ -138,7 +148,7 @@
                 </table>
               </section>
 
-              <!-- 三、验收组织 -->
+              
               <section id="sec-org" class="paper-sec">
                 <h3 class="ps-h1">三、验收组织与人员分工</h3>
                 <table class="ps-table">
@@ -162,7 +172,7 @@
                 <p class="ps-fine">注：人员名单取自系统账号与工程档案，现场签到以签字栏为准。</p>
               </section>
 
-              <!-- 四、测试方法与环境 -->
+              
               <section id="sec-method" class="paper-sec">
                 <h3 class="ps-h1">四、测试方法与环境说明</h3>
                 <ul class="ps-list">
@@ -170,7 +180,7 @@
                 </ul>
               </section>
 
-              <!-- 五、验收项清单 -->
+              
               <section id="sec-checklist" class="paper-sec">
                 <h3 class="ps-h1">五、验收项清单与判定准则</h3>
                 <table v-if="checklist.length" class="ps-table dense">
@@ -198,7 +208,7 @@
                 <p v-else class="ps-fine">（方案未配置检查项）</p>
               </section>
 
-              <!-- 六、分项测试结果 -->
+              
               <section id="sec-result" class="paper-sec">
                 <h3 class="ps-h1">六、分项测试结果</h3>
                 <h4 class="ps-h2">6.1　分项判定汇总</h4>
@@ -252,7 +262,7 @@
                 </div>
               </section>
 
-              <!-- 七、问题清单 -->
+              
               <section id="sec-finding" class="paper-sec">
                 <h3 class="ps-h1">七、问题清单</h3>
                 <table v-if="findings.length" class="ps-table dense">
@@ -285,7 +295,7 @@
                 </p>
               </section>
 
-              <!-- 八、结论与统计 -->
+              
               <section id="sec-conclusion" class="paper-sec">
                 <h3 class="ps-h1">八、验收结论与统计</h3>
                 <table class="ps-kv narrow">
@@ -303,7 +313,7 @@
                 <p v-if="current.statusMessage" class="ps-fine">批次备注：{{ current.statusMessage }}</p>
               </section>
 
-              <!-- 签字栏 + 附录提示 -->
+              
               <section class="paper-sec">
                 <h3 class="ps-h1">九、签字确认</h3>
                 <div class="ps-sign">
@@ -341,7 +351,7 @@ const router = useRouter()
 
 const loading = ref(false)
 const generating = ref(false)
-// 工程上下文来自全局 store（顶栏切换器是唯一入口）
+// 工程上下文来自全局store
 const projectStore = useProjectStore()
 const { projects, projectId } = storeToRefs(projectStore)
 const plans = ref([])
@@ -388,7 +398,7 @@ const subtitle = computed(() => {
   parts.push(`${batches.value.length} 个批次`)
   const done = batches.value.filter((b) => b.status === 'DONE').length
   parts.push(`可出具 ${done} 份`)
-  if (mockMode.value) parts.push('演示数据')
+  if (mockMode.value) parts.push('离线数据')
   return parts.filter(Boolean).join(' · ')
 })
 
@@ -593,7 +603,6 @@ function nameOf(username) {
   return m?.realName || username
 }
 
-/** 方案名末尾已带版本号（如"…方案 V1.0"）时不再重复拼 v1.0（与方案设计页同规则） */
 const VER_TAIL = /\s*v?\d+(\.\d+){0,2}\s*$/i
 function nameHasVer(name) {
   return VER_TAIL.test(String(name || ''))
@@ -738,7 +747,6 @@ watch(
   gap: 14px;
 }
 
-/* ── 左：批次档案 ── */
 .rp-list {
   display: flex;
   flex-direction: column;
@@ -908,7 +916,6 @@ watch(
   color: var(--nms-text-muted);
 }
 
-/* ── 右：预览 ── */
 .rp-main {
   display: flex;
   flex-direction: column;
@@ -977,7 +984,6 @@ watch(
   scroll-behavior: smooth;
 }
 
-/* ── 纸张 ── */
 .rp-paper {
   max-width: 940px;
   margin: 0 auto;
@@ -1231,7 +1237,6 @@ watch(
   color: #7a8794;
 }
 
-
 .ps-verdict-text {
   font-size: 13.5px;
   font-weight: 700;
@@ -1272,7 +1277,6 @@ watch(
   text-align: center;
 }
 
-/* 结论 / 状态着色 */
 .tone-ok {
   color: #0f7b4f;
 }

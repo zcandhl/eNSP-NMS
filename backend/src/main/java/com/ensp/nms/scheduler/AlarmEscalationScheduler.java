@@ -7,8 +7,13 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 /**
- * 每 5 分钟扫描超时待处理告警并按策略升级。
- */
+ * 定时扫描超时待处理告警并按策略升级。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15 */
+
 @Slf4j
 @Component
 @RequiredArgsConstructor

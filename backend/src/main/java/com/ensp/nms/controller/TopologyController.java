@@ -12,6 +12,14 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * 拓扑全图、节点位置、链路维护与邻居发现接口。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15 */
+
 @Slf4j
 @RestController
 @RequestMapping("/api/topology")

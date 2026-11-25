@@ -12,6 +12,14 @@ import org.springframework.web.socket.server.HandshakeInterceptor;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * WebSocket 握手拦截器，校验连接令牌与登录状态。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15 */
+
 @Slf4j
 @Component
 @RequiredArgsConstructor

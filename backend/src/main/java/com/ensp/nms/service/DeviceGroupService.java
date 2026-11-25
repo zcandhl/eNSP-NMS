@@ -14,6 +14,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+/**
+ * 设备分组增删改查与成员集合维护。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15 */
+
 @Service
 @RequiredArgsConstructor
 public class DeviceGroupService {
@@ -57,7 +65,6 @@ public class DeviceGroupService {
         return deviceRepository.findByGroupId(groupId);
     }
 
-    /** 预览成员变更：哪些设备将从其他分组迁入 */
     public Map<String, Object> previewSetMembers(Long groupId, List<Long> deviceIds) {
         if (!deviceGroupRepository.existsById(groupId)) {
             throw new RuntimeException("分组不存在");
@@ -99,7 +106,6 @@ public class DeviceGroupService {
         return result;
     }
 
-    /** 将指定设备划入分组；原成员若不在列表中则移出分组 */
     @Transactional
     public Map<String, Object> setMembers(Long groupId, List<Long> deviceIds) {
         if (!deviceGroupRepository.existsById(groupId)) {

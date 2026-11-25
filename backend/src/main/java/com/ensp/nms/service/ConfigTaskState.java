@@ -6,7 +6,14 @@ import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
 
-/** 配置异步任务状态（内存实时 + DB 持久化视图） */
+/**
+ * 配置异步任务状态
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15 */
+
 @Data
 public class ConfigTaskState {
     private String id;

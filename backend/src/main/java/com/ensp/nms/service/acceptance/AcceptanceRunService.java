@@ -42,14 +42,13 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * 方案驱动的验收引擎（V3 核心）。
+ * 验收计划执行、干跑、确认、作废与批次回收。
  *
- * 设计原则：
- * 1. 验收什么 = 方案数据（AcceptancePlan.checksJson），不是代码；
- * 2. 怎么采集 = 9 类固定原语，全部走底座已有的 SSH 只读通道；
- * 3. 怎么判定 = SpEL 表达式对 metrics 求值；
- * 4. 批次快照逐项冻结落库，报告只读快照、绝不重跑。
- */
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-11-22 */
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -70,29 +69,20 @@ public class AcceptanceRunService {
     private final ObjectMapper objectMapper;
     private final AcceptanceSeqService seqService;
 
-    /** 设备级并行采集线程池（17 台串行太慢，4 路并行约 20 秒） */
     private final ExecutorDevicePool pool = new ExecutorDevicePool();
 
-    /** 人工终止标记：批次号 → true。执行线程在每个检查项间隙感知，当前项采集完即停 */
     private final Map<String, Boolean> cancelFlags = new ConcurrentHashMap<>();
 
-    /** 取消原因：仅用于把"人工终止"与"超时自动中断"区分开，缺省按人工终止处理 */
     private final Map<String, String> cancelReasons = new ConcurrentHashMap<>();
 
-    /** 进程内仍在跑的批次：不在集合里的 RUNNING 批次 = 孤儿（线程已消失），由看门狗收尾 */
     private final Set<String> liveBatches = ConcurrentHashMap.newKeySet();
 
-    /** 批次运行超过该分钟数视为卡死，主动打断（默认 30 分钟） */
     @Value("${nms.acceptance.stale-minutes:30}")
     private long staleMinutes;
 
-    /** 新批次刚起跑、线程尚未登记时的宽限秒数，避免误杀 */
     @Value("${nms.acceptance.orphan-grace-seconds:90}")
     private long orphanGraceSeconds;
 
-    // ────────────────────────── 对外入口 ──────────────────────────
-
-    /** 启动一次验收：立即返回批次号，后台线程逐项执行并冻结快照 */
     public Map<String, Object> runPlan(Long planId, List<Long> deviceIds) {
         AcceptancePlan plan = requirePlan(planId);
         List<Map<String, Object>> checks = enabledChecks(plan);
@@ -123,7 +113,6 @@ public class AcceptanceRunService {
         return out;
     }
 
-    /** 试运行：只跑一项、可指定单台设备，不产生批次 */
     public Map<String, Object> dryRun(Long planId, Long checkId, Long deviceId) {
         AcceptancePlan plan = requirePlan(planId);
         Map<String, Object> check = enabledChecks(plan).stream()
@@ -146,7 +135,6 @@ public class AcceptanceRunService {
         return result;
     }
 
-    /** 人工确认（项⑤故障预演等人机环节）：execute=执行，skip=跳过 */
     public Map<String, Object> confirmItem(String batchId, Long checkId, String decision, String note, String operator) {
         AcceptanceBatch batch = batchRepository.findById(batchId)
                 .orElseThrow(() -> new IllegalArgumentException("批次不存在"));
@@ -164,7 +152,7 @@ public class AcceptanceRunService {
             item.put("status", "SKIPPED");
             item.put("message", "人工跳过（" + who + "，未执行故障预演）");
         } else if ("pass".equalsIgnoreCase(decision) || "fail".equalsIgnoreCase(decision)) {
-            // 人工实测后记录结论：通过记 PASS，不通过记 FAIL，报告按此判定
+            // 人工实测后记录结论：通过记PASS，不通过记FAIL，报告按此判定
             item.put("status", "pass".equalsIgnoreCase(decision) ? "PASS" : "FAIL");
             item.put("message", "人工执行确认（" + who + "，判定" + ("pass".equalsIgnoreCase(decision) ? "通过" : "不通过") + "）" + tail);
             item.put("manual", true);
@@ -190,7 +178,6 @@ public class AcceptanceRunService {
         return v == null ? "" : String.valueOf(v);
     }
 
-    /** 人工终止批次：采集线程在每个检查项间隙感知取消标记；若批次只是停在人工确认则立即落定 */
     public Map<String, Object> stopBatch(String batchId) {
         AcceptanceBatch batch = batchRepository.findById(batchId)
                 .orElseThrow(() -> new IllegalArgumentException("批次不存在"));
@@ -221,7 +208,6 @@ public class AcceptanceRunService {
         return getBatch(batchId);
     }
 
-    /** 作废批次（仅 DONE 可作废）：保留记录与编号，作废后不可出报告 */
     public Map<String, Object> voidBatch(String batchId, String reason) {
         AcceptanceBatch batch = batchRepository.findById(batchId)
                 .orElseThrow(() -> new IllegalArgumentException("批次不存在"));
@@ -235,7 +221,6 @@ public class AcceptanceRunService {
         return getBatch(batchId);
     }
 
-    /** 删除批次（仅限中断/失败的试验批次）：已完成与已作废的批次保留，不破坏追溯链 */
     public void deleteBatch(String batchId) {
         AcceptanceBatch batch = batchRepository.findById(batchId)
                 .orElseThrow(() -> new IllegalArgumentException("批次不存在"));
@@ -282,11 +267,6 @@ public class AcceptanceRunService {
                 .toList();
     }
 
-    /**
-     * 跨方案查询运行中的验收批次（全局视角）。
-     * 供工作台顶栏的全局运行指示器与"运行中的验收"弹窗轮询使用：
-     * 切换到其他方案编辑时，仍能看到任意方案正在执行的批次与实时进度。
-     */
     public List<Map<String, Object>> listRunningBatches() {
         return batchRepository.findByStatus("RUNNING").stream()
                 .sorted(java.util.Comparator.comparing(AcceptanceBatch::getStartedAt,
@@ -313,10 +293,6 @@ public class AcceptanceRunService {
                 .toList();
     }
 
-    /**
-     * 批次进度视图：只算真正落定的项——待人工确认（PENDING）与采集中（WAITING）不算完成，
-     * 否则会出现"运行中 7/7"的假完成。current 为正在执行的检查项名。
-     */
     private Map<String, Object> progressOf(List<Map<String, Object>> items) {
         int done = (int) items.stream()
                 .filter(i -> !"WAITING".equals(i.get("status")) && !"PENDING".equals(i.get("status")))
@@ -338,8 +314,6 @@ public class AcceptanceRunService {
         return progress;
     }
 
-    // ────────────────────────── 批次执行 ──────────────────────────
-
     private void executeBatch(String batchId, Long planId, List<Map<String, Object>> checks, List<Device> devices) {
         liveBatches.add(batchId);
         try {
@@ -358,14 +332,14 @@ public class AcceptanceRunService {
                 Map<String, Object> item = items.stream()
                         .filter(i -> numLong(i.get("checkId")).equals(numLong(check.get("id"))))
                         .findFirst()
-                        // 兜底：方案被前端整体回写过 checks 时 id 可能丢失，用 code 再匹配一次，
+                        // 兜底：方案被前端整体回写过checks时id可能丢失，用code再匹配一次
                         // 否则该项会被静默跳过、批次停在"无执行线程"被看门狗误判中断
                         .orElseGet(() -> items.stream()
                                 .filter(i -> str(i.get("code")).equals(str(check.get("code"))))
                                 .findFirst()
                                 .orElse(null));
                 if (item == null || !"WAITING".equals(item.get("status"))) {
-                    continue; // PENDING（等人确认）或已被处理
+                    continue; // PENDING或已被处理
                 }
                 if (Boolean.TRUE.equals(check.get("needConfirm"))) {
                     item.put("status", "PENDING");
@@ -392,16 +366,6 @@ public class AcceptanceRunService {
         }
     }
 
-    // ────────────────────── 僵尸批次看门狗 ──────────────────────
-
-    /**
-     * 每分钟巡检一次 RUNNING 批次，解决"批次挂十几个小时都显示运行中"：
-     * 1) 进程内已没有执行线程（liveBatches 不含）且超过宽限期 → 线程已消失，立即中断收尾；
-     * 2) 线程还在但运行超时（默认 30 分钟）→ 下取消标记，执行线程在下一个检查项间隙收尾。
-     *
-     * 停在"等待人工确认"的批次不算僵尸：确认可能隔很久，不能自动杀掉。
-     * 中断只把 WAITING 项标跳过，PENDING 项保留，人工仍可继续确认。
-     */
     @Scheduled(fixedDelayString = "${nms.acceptance.watchdog-ms:60000}",
             initialDelayString = "${nms.acceptance.watchdog-initial-delay-ms:120000}")
     public void reapStaleBatches() {
@@ -423,7 +387,7 @@ public class AcceptanceRunService {
                     if (elapsedSec < orphanGraceSeconds) {
                         continue;
                     }
-                    // 仍在执行中的项（WAITING）：SSH 采集 13 台设备可能超过 90 秒宽限期，
+                    // 仍在执行中的项（WAITING）：SSH采集13台设备可能超过90秒宽限期
                     // 单凭"进程内无登记"就中断会把正常采集误杀，故留足采集窗口
                     if (hasWaiting && elapsedSec < orphanGraceSeconds * 6) {
                         continue;
@@ -450,7 +414,6 @@ public class AcceptanceRunService {
         }
     }
 
-    /** 看门狗落定：未执行项标跳过，已确认的项保留快照 */
     private void interruptStale(AcceptanceBatch batch, List<Map<String, Object>> items, String reason) {
         for (Map<String, Object> item : items) {
             if ("WAITING".equals(item.get("status"))) {
@@ -472,7 +435,6 @@ public class AcceptanceRunService {
         return sec >= 60 ? (sec / 60) + " 分" : sec + " 秒";
     }
 
-    /** 人工终止落定：未执行/待确认项标 SKIPPED，状态 INTERRUPTED（不进 settle，避免被写回 RUNNING） */
     private void abortBatch(AcceptanceBatch batch, List<Map<String, Object>> items, String reason) {        for (Map<String, Object> item : items) {
             if ("WAITING".equals(item.get("status"))) {
                 item.put("status", "SKIPPED");
@@ -489,7 +451,6 @@ public class AcceptanceRunService {
         batchRepository.save(batch);
     }
 
-    /** 收尾：全部落定则 DONE；还停在人工确认则保持原状态并写明等哪几项（中断批次不被唤醒） */
     private void settle(AcceptanceBatch batch, List<Map<String, Object>> items) {
         // 覆盖窗口期：终止指令在最后一项采集完成之后、收尾之前到达
         if (cancelFlags.remove(batch.getBatchId()) != null) {
@@ -517,7 +478,6 @@ public class AcceptanceRunService {
         batchRepository.save(batch);
     }
 
-    /** 异常兜底：把批次置为 FAILED，未执行的项标记跳过，绝不让它停在“运行中” */
     private void markFailed(String batchId, Exception cause) {
         try {
             batchRepository.findById(batchId).ifPresent(batch -> {
@@ -546,7 +506,6 @@ public class AcceptanceRunService {
         }
     }
 
-    /** 批次号取持久化自增序号：删除历史批次不会回退，避免主键冲突与报告重号 */
     private long nextBatchSeq() {
         long initFrom = 0;
         String maxId = batchRepository.findMaxBatchId();
@@ -554,7 +513,7 @@ public class AcceptanceRunService {
             try {
                 initFrom = Long.parseLong(maxId.substring(2));
             } catch (NumberFormatException ignored) {
-                // 历史数据不规范时从 0 起算，序号表本身只增不减
+                // 历史数据不规范时从0起算，序号表本身只增不减
             }
         }
         return seqService.next(AcceptanceSeqService.SCOPE_BATCH, initFrom);
@@ -564,12 +523,6 @@ public class AcceptanceRunService {
         return items.stream().noneMatch(i -> "WAITING".equals(i.get("status")) || "PENDING".equals(i.get("status")));
     }
 
-    // ────────────────────────── 单项执行 ──────────────────────────
-
-    /**
-     * 执行一个检查项：采集 metrics + rawOutput → SpEL 判定 → PASS/FAIL/FINDING。
-     * 这是"方案驱动"里唯一按原语类型分支的地方，新增原语在这里加一个 case。
-     */
     private Map<String, Object> executeCheck(Map<String, Object> check, List<Device> devices) {
         String type = str(check.get("type"));
         Map<String, Object> params = castMap(check.get("params"));
@@ -579,7 +532,7 @@ public class AcceptanceRunService {
         List<Map<String, Object>> findings = new ArrayList<>();
         String message = null;
 
-        // 设备范围过滤：路由类巡检不应下发到二层接入交换机（无 OSPF/VRRP，白耗时间且污染报告）
+        // 设备范围过滤：路由类巡检不应下发到二层接入交换机
         List<Device> scoped = scopeDevices(params, devices);
         if (scoped.size() < devices.size()) {
             raw.append("# 设备范围：按方案范围执行 ").append(scoped.size())
@@ -652,25 +605,21 @@ public class AcceptanceRunService {
         return out;
     }
 
-    /** SpEL：root 是 Map + MapAccessor，方案里的表达式无需 # 前缀即可引用变量与指标 */
     private Object evaluate(String expr, Map<String, Object> root) {
         StandardEvaluationContext ctx = new StandardEvaluationContext(root);
         ctx.addPropertyAccessor(new MapAccessor());
         return SPEL.parseExpression(expr).getValue(ctx);
     }
 
-    /** 方案表达式里允许写 min(device.complianceScore)，求值前归一为 minComplianceScore */
     private static String normalizeAssert(String expr) {
         return expr == null ? "true" : expr.replace("min(device.complianceScore)", "minComplianceScore");
     }
 
-    // ────────────────────────── 9 类原语 ──────────────────────────
-
     private void checkTopology(Map<String, Object> params, List<Device> scoped, Map<String, Object> ctx,
                                Map<String, Object> metrics, StringBuilder raw) {
         // 口径与拓扑视图保持一致：节点 = 本批次范围内的纳管设备。
-        // topology_node 只存"被拖拽过"的坐标，未拖拽的设备没有记录，
-        // 若拿它当节点数，会出现拓扑页画着 12 个节点、检查却说 0 个的矛盾。
+        // topology_node只存"被拖拽过"的坐标，未拖拽的设备没有记录
+        // 若拿它当节点数，会出现拓扑页画着12个节点、检查却说0个的矛盾。
         Set<Long> scopedIds = new java.util.HashSet<>();
         for (Device d : scoped) {
             if (d.getId() != null) {
@@ -727,7 +676,7 @@ public class AcceptanceRunService {
         metrics.put("total", total);
         ctx.put("reachability", metrics);
         if (up == 0 && total > 0) {
-            raw.append("全部不可达：请检查 eNSP 桥接、设备远程管理是否开启（SSH: stelnet server enable / Telnet: telnet server enable）\n");
+            raw.append("全部不可达：请检查网络桥接、设备远程管理是否开启（SSH: stelnet server enable / Telnet: telnet server enable）\n");
         }
     }
 
@@ -874,7 +823,7 @@ public class AcceptanceRunService {
         if (!noSsh.isEmpty()) {
             raw.append("\n跳过 ").append(noSsh.size()).append(" 台未配置 SSH 凭据的设备\n");
         }
-        // 注意：指标名不能与参数名撞车（minScore 是阈值参数），实测最低分用 lowestScore
+        // 注意：指标名不能与参数名撞车，实测最低分用lowestScore
         metrics.put("lowestScore", minScore);
         metrics.put("devices", sshDevices.size());
         metrics.put("failed", below);
@@ -962,18 +911,11 @@ public class AcceptanceRunService {
         return m.find() ? Double.parseDouble(m.group()) : Double.NEGATIVE_INFINITY;
     }
 
-    // ────────────────────────── 采集辅助 ──────────────────────────
-
     private boolean hasSsh(Device d) {
         return d.getSshUsername() != null && !d.getSshUsername().isBlank()
                 && d.getSshPassword() != null && !d.getSshPassword().isBlank();
     }
 
-    /**
-     * 检查项设备范围过滤：params.deviceTypes / params.deviceNames（逗号分隔文本或数组，不区分大小写）。
-     * 两者都为空 = 不过滤（兼容历史方案）。路由类巡检（OSPF/VRRP）用 deviceTypes 圈定，
-     * 精确到台时叠加 deviceNames；范围在报告与快照中留痕（scopedDevices/excludedDevices）。
-     */
     private List<Device> scopeDevices(Map<String, Object> params, List<Device> devices) {
         java.util.Set<String> types = csvSet(params.get("deviceTypes"));
         java.util.Set<String> names = csvSet(params.get("deviceNames"));
@@ -1004,7 +946,6 @@ public class AcceptanceRunService {
         return v == null ? "" : v.trim().toLowerCase();
     }
 
-    /** 并行对多台设备执行同一条 display 命令（设备名 → 输出）。按设备管理协议分流 SSH/Telnet，走只读查询专用通道 */
     private Map<String, String> runShowParallel(List<Device> devices, String command) {
         Map<String, String> out = new LinkedHashMap<>();
         List<Map.Entry<String, String>> results = pool.submitAll(devices, d -> {
@@ -1023,7 +964,6 @@ public class AcceptanceRunService {
         return out;
     }
 
-    /** 设备管理端口：Telnet 管理 → 23，其余按配置或默认 22 */
     private static int mgmtPort(Device d) {
         if (d.isTelnetManagement()) {
             return 23;
@@ -1031,12 +971,10 @@ public class AcceptanceRunService {
         return d.getSshPort() != null ? d.getSshPort() : 22;
     }
 
-    /** 设备管理协议：telnet / ssh（空值兜底 ssh） */
     private static String mgmtProtocol(Device d) {
         return d.isTelnetManagement() ? "telnet" : "ssh";
     }
 
-    /** 并行拉取运行配置（live 失败回退最新备份） */
     private Map<String, String> pullConfigsParallel(List<Device> devices) {
         Map<String, String> out = new LinkedHashMap<>();
         List<Map.Entry<String, String>> results = pool.submitAll(devices, d -> {
@@ -1071,7 +1009,6 @@ public class AcceptanceRunService {
         }
     }
 
-    /** 逐行对称差（忽略 # 注释与空行），用于配置基线比对 */
     private static int diffCount(String live, String baseline) {
         var a = linesOf(live);
         var b = linesOf(baseline);
@@ -1117,8 +1054,6 @@ public class AcceptanceRunService {
         }
         return s.length() <= max ? s : s.substring(0, max) + "\n…（截断，全文见报告附录）";
     }
-
-    // ────────────────────────── 数据组装 ──────────────────────────
 
     private AcceptancePlan requirePlan(Long planId) {
         return planRepository.findById(planId)
@@ -1246,7 +1181,7 @@ public class AcceptanceRunService {
         return v == null ? new LinkedHashMap<>() : (Map<String, Object>) v;
     }
 
-    /** 简单并行工具：4 路设备级并发 */
+/** 简单并行工具：4路设备级并发 */
     private static class ExecutorDevicePool {
         private final ExecutorService pool = Executors.newFixedThreadPool(4);
 

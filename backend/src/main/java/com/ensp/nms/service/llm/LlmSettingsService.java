@@ -10,6 +10,14 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+/**
+ * LLM 设置读取、解析、公开视图与更新。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15 */
+
 @Service
 @RequiredArgsConstructor
 public class LlmSettingsService {
@@ -51,7 +59,6 @@ public class LlmSettingsService {
         return m;
     }
 
-    /** 运行时解析后的明文配置（含解密 Key） */
     @Transactional
     public ResolvedSettings resolve() {
         LlmSettings s = getOrCreate();

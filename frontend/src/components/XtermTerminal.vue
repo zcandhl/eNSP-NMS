@@ -1,3 +1,13 @@
+/**
+ * @file    XtermTerminal.vue
+ * @module  通用组件
+ * @desc    xterm.js 终端仿真组件，维护会话与输入回显。
+ *
+ * @author  ZC
+ * @date    2026-08-15 * @version 1.0.0
+ * @requires @element-plus/icons-vue, element-plus, vue, xterm, xterm-addon-fit, xterm-addon-web-links
+ */
+
 <template>
   <div class="xterm-terminal-container">
     <div class="terminal-header">
@@ -55,7 +65,7 @@ const props = defineProps({
     type: String,
     default: ''
   },
-  /** 挂载后自动发起 SSH 连接（告警弹层等值班场景） */
+  
   autoConnect: {
     type: Boolean,
     default: false
@@ -139,7 +149,7 @@ const initTerminal = () => {
         const after = `${term.cols}x${term.rows}`
         if (before !== after) notifyPtyResize()
       } catch (e) {
-        /* ignore */
+        
       }
     })
   })
@@ -159,7 +169,7 @@ const notifyPtyResize = () => {
       rows: term.rows
     }))
   } catch (e) {
-    /* ignore */
+    
   }
 }
 
@@ -247,7 +257,7 @@ const connect = (opts = {}) => {
             try {
               if (fit) fit.fit()
               notifyPtyResize()
-            } catch (e) { /* ignore */ }
+            } catch (e) {  }
             ElMessage.success('连接成功')
             break
           case 'error':
@@ -305,7 +315,7 @@ onMounted(() => {
   initTerminal()
   if (props.autoConnect && props.deviceId) {
     nextTick(() => {
-      // 等 dialog / layout 完成后再 fit + 连接
+      // 等dialog / layout完成后再fit + 连接
       setTimeout(() => {
         if (fit) fit.fit()
         connect({ silentBusy: true })

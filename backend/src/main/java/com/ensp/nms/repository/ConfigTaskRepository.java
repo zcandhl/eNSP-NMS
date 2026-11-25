@@ -8,6 +8,15 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.List;
 
+/**
+ * 配置异步任务数据访问仓库：封装对应实体的持久化查询与写入。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15
+ */
+
 public interface ConfigTaskRepository extends JpaRepository<ConfigTask, String> {
 
     List<ConfigTask> findByCreatedAtAfterOrderByCreatedAtDesc(LocalDateTime after);

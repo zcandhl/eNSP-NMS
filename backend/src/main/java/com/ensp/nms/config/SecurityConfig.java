@@ -21,6 +21,14 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import java.util.Arrays;
 import java.util.List;
 
+/**
+ * Web 安全过滤链、密码编码器、跨域与接口授权规则配置。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15 */
+
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity
@@ -52,19 +60,17 @@ public class SecurityConfig {
                 .requestMatchers("/ws/**").permitAll()
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
-                // 用户 / 角色 / 权限
+                // native单端口部署时由后端托管前端构建目录，仅静态资源可匿名访问
+                .requestMatchers("/", "/index.html", "/favicon.ico", "/assets/**").permitAll()
+
                 .requestMatchers("/api/users/**").hasAuthority("users:manage")
                 .requestMatchers("/api/roles/**", "/api/permissions/**").hasAnyAuthority("roles:manage", "users:manage")
 
-                // 操作日志
                 .requestMatchers(HttpMethod.GET, "/api/audit-logs", "/api/audit-logs/**")
                     .hasAuthority("audit:read")
 
-                // 测试工具
-                .requestMatchers("/api/mock/**").hasAuthority("system:test")
                 .requestMatchers("/api/snmp/**").hasAuthority("system:test")
 
-                // 设备
                 .requestMatchers(HttpMethod.GET, "/api/devices/discover/**").hasAuthority("devices:discover")
                 .requestMatchers(HttpMethod.GET, "/api/devices", "/api/devices/**").hasAuthority("devices:read")
                 .requestMatchers(HttpMethod.POST, "/api/devices/discover", "/api/devices/discover/**").hasAuthority("devices:discover")
@@ -76,7 +82,6 @@ public class SecurityConfig {
                 .requestMatchers("/api/device-groups/**")
                     .hasAnyAuthority("devices:write", "configs:write")
 
-                // 告警
                 .requestMatchers(HttpMethod.GET, "/api/alarms", "/api/alarms/**").hasAuthority("alarms:read")
                 .requestMatchers(HttpMethod.PUT, "/api/alarms/**").hasAnyAuthority("alarms:handle", "alarms:write")
                 .requestMatchers(HttpMethod.POST, "/api/alarms/batch-delete").hasAuthority("alarms:write")
@@ -85,7 +90,6 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.POST, "/api/alarms/**").hasAnyAuthority("alarms:handle", "alarms:write")
                 .requestMatchers(HttpMethod.DELETE, "/api/alarms/**").hasAuthority("alarms:write")
 
-                // 配置
                 .requestMatchers(HttpMethod.GET,
                         "/api/configs/**", "/api/config-templates/**",
                         "/api/config-change-logs/**", "/api/backup-schedules/**")
@@ -97,28 +101,25 @@ public class SecurityConfig {
                         "/api/config-change-logs/**", "/api/backup-schedules/**")
                     .hasAuthority("configs:write")
 
-                // 拓扑
                 .requestMatchers(HttpMethod.GET, "/api/topology", "/api/topology/**").hasAuthority("topology:read")
                 .requestMatchers("/api/topology/**").hasAuthority("topology:write")
 
-                // 性能
                 .requestMatchers(HttpMethod.GET, "/api/performance/**", "/api/performance-alerts/**")
                     .hasAuthority("performance:read")
                 .requestMatchers(HttpMethod.POST, "/api/performance-alerts/**")
                     .hasAuthority("alarms:handle")
 
-                // 验收工作台：读=查看权限，写（跑验收/改方案/出报告）=配置写权限
+                // 验收工作台：读=查看权限，写=配置写权限
                 .requestMatchers(HttpMethod.GET, "/api/acceptance/**")
                     .hasAnyAuthority("configs:read", "devices:read")
                 .requestMatchers("/api/acceptance/**")
                     .hasAnyAuthority("configs:write", "devices:write")
 
-                // WebSSH HTTP API
                 .requestMatchers("/api/webssh/**").hasAuthority("webssh:connect")
 
                 .requestMatchers("/api/**").authenticated()
-                // 静态前端（native 单端口托管 ./web）与其它非 API 资源
-                .anyRequest().permitAll()
+                // 未在上面显式放行的路径一律拒绝，避免默认放行遗留接口
+                .anyRequest().denyAll()
             )
             .exceptionHandling(ex -> ex
                 .authenticationEntryPoint((request, response, authException) -> {

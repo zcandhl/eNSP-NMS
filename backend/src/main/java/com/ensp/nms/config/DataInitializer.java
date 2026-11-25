@@ -1,42 +1,46 @@
 package com.ensp.nms.config;
 
+import com.ensp.nms.device.DeviceType;
 import com.ensp.nms.entity.Device;
-import com.ensp.nms.entity.DevicePort;
 import com.ensp.nms.entity.Role;
 import com.ensp.nms.entity.User;
-import com.ensp.nms.repository.DevicePortRepository;
 import com.ensp.nms.repository.DeviceRepository;
 import com.ensp.nms.repository.RoleRepository;
 import com.ensp.nms.repository.UserRepository;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
-import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Set;
 
+/**
+ * 首次启动时初始化内置管理员、角色与权限基础数据。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15 */
+
+@Slf4j
 @Configuration
 public class DataInitializer {
 
-    /** 是否在空库中写入演示设备（默认关闭，避免删光设备后重启又出现） */
-    @org.springframework.beans.factory.annotation.Value("${nms.seed-demo-devices:false}")
-    private boolean seedDemoDevices;
+    private static final String DEFAULT_PASSWORD = "Admin@123";
 
-    /**
-     * 顺序很关键：先建 RBAC（权限/角色）、再建默认账号，最后才是各业务模块的种子。
-     * 不写 @Order 时与 ApplicationRunner 的先后不可控——曾导致队员账号拿到空角色、
-     * 全新库里 admin 也没被创建（userRepository.count() 已被队员账号占满）。
-     */
+    @org.springframework.beans.factory.annotation.Value("${nms.bootstrap.admin-username:admin}")
+    private String bootstrapAdminUsername;
+
+    @org.springframework.beans.factory.annotation.Value("${nms.bootstrap.admin-password:}")
+    private String bootstrapAdminPassword;
+
     @Bean
     @Order(0)
     CommandLineRunner initDatabase(
             DeviceRepository deviceRepository,
-            DevicePortRepository devicePortRepository,
             UserRepository userRepository,
             RoleRepository roleRepository,
             BCryptPasswordEncoder passwordEncoder,
@@ -45,13 +49,8 @@ public class DataInitializer {
         return args -> {
             rbacSeedService.ensureRbacSeeded();
 
-            // 数据校准：AC6005 在 eNSP 中 SSH 服务异常（KEXINIT 后无响应），
-            // AC 类设备统一改用 telnet 管理，端口同步为 23，避免历史数据仍按 22 去连。
-            for (Device d : deviceRepository.findAll()) {
-                if (com.ensp.nms.device.DeviceType.fromCode(d.getDeviceType())
-                        != com.ensp.nms.device.DeviceType.AC) {
-                    continue;
-                }
+            // 部分AC设备SSH协商不稳定，统一改用telnet管理，端口同步为23
+            for (Device d : deviceRepository.findByDeviceType(DeviceType.AC.getCode())) {
                 boolean changed = false;
                 if (!d.isTelnetManagement()) {
                     d.setManagementProtocol("telnet");
@@ -67,13 +66,17 @@ public class DataInitializer {
             }
 
             if (userRepository.count() == 0) {
+                String rawPassword = bootstrapAdminPassword;
+                if (rawPassword == null || rawPassword.isBlank()) {
+                    rawPassword = DEFAULT_PASSWORD;
+                    log.info("使用默认管理员口令，请首次登录后立即修改");
+                }
                 Role adminRole = roleRepository.findByName("ADMIN").orElse(null);
-                Role operatorRole = roleRepository.findByName("OPERATOR").orElse(null);
-                
+
                 User admin = new User();
-                admin.setUsername("admin");
-                admin.setPassword(passwordEncoder.encode("Admin@123"));
-                admin.setEmail("admin@ensp.local");
+                admin.setUsername(bootstrapAdminUsername);
+                admin.setPassword(passwordEncoder.encode(rawPassword));
+                admin.setEmail("admin@nms.local");
                 admin.setRealName("系统管理员");
                 admin.setMustChangePassword(true);
                 if (adminRole != null) {
@@ -81,126 +84,18 @@ public class DataInitializer {
                     roles.add(adminRole);
                     admin.setRoles(roles);
                 }
-                
-                User operator = new User();
-                operator.setUsername("operator");
-                operator.setPassword(passwordEncoder.encode("Operator@123"));
-                operator.setEmail("operator@ensp.local");
-                operator.setRealName("运维操作员");
-                operator.setMustChangePassword(true);
-                if (operatorRole != null) {
-                    Set<Role> roles = new HashSet<>();
-                    roles.add(operatorRole);
-                    operator.setRoles(roles);
-                }
-                
                 userRepository.save(admin);
-                userRepository.save(operator);
+                log.info("管理员账号 {} 已初始化，首次登录须修改密码", bootstrapAdminUsername);
             }
 
-            // 已有库：默认口令仍为 Admin@123 的账号，补强制改密标记
-            userRepository.findByUsername("admin").ifPresent(u -> {
-                if (passwordEncoder.matches("Admin@123", u.getPassword())
-                        && !Boolean.TRUE.equals(u.getMustChangePassword())) {
+            // 既有库中管理员账号未标记强制改密的，补上该标记
+            userRepository.findByUsername(bootstrapAdminUsername).ifPresent(u -> {
+                if (!Boolean.TRUE.equals(u.getMustChangePassword())) {
                     u.setMustChangePassword(true);
                     userRepository.save(u);
                 }
             });
-            userRepository.findByUsername("operator").ifPresent(u -> {
-                if (passwordEncoder.matches("Operator@123", u.getPassword())
-                        && !Boolean.TRUE.equals(u.getMustChangePassword())) {
-                    u.setMustChangePassword(true);
-                    userRepository.save(u);
-                }
-            });
-
-            // 演示种子设备默认关闭：真实库里删光设备后重启，绝不能再「变」出三台演示设备，
-            // 否则会被误认为「删了又回来」。需要空白演示环境时用 NMS_SEED_DEMO=true 开启。
-            if (seedDemoDevices && deviceRepository.count() == 0) {
-                Device d1 = new Device();
-                d1.setName("AR2220-路由器-01");
-                d1.setIpAddress("192.168.56.10");
-                d1.setModel("AR2220");
-                d1.setVendor("Huawei");
-                d1.setSnmpVersion("v2c");
-                d1.setSnmpCommunity("public");
-                d1.setSnmpPort(161);
-                d1.setSshUsername("admin");
-                d1.setSshPassword("Admin@123456");
-                d1.setSshPort(22);
-                d1.setStatus("online");
-                d1.setDescription("eNSP 模拟路由器");
-                d1.setLastSeen(LocalDateTime.now());
-                d1 = deviceRepository.save(d1);
-
-                Device d2 = new Device();
-                d2.setName("S5700-交换机-01");
-                d2.setIpAddress("192.168.56.11");
-                d2.setModel("S5700");
-                d2.setVendor("Huawei");
-                d2.setSnmpVersion("v2c");
-                d2.setSnmpCommunity("public");
-                d2.setSnmpPort(161);
-                d2.setStatus("online");
-                d2.setDescription("eNSP 模拟交换机");
-                d2.setLastSeen(LocalDateTime.now());
-                d2 = deviceRepository.save(d2);
-
-                Device d3 = new Device();
-                d3.setName("USG6000-防火墙-01");
-                d3.setIpAddress("192.168.56.12");
-                d3.setModel("USG6000");
-                d3.setVendor("Huawei");
-                d3.setSnmpVersion("v2c");
-                d3.setSnmpCommunity("public");
-                d3.setSnmpPort(161);
-                d3.setStatus("offline");
-                d3.setDescription("eNSP 模拟防火墙");
-                d3 = deviceRepository.save(d3);
-
-                List<DevicePort> d1Ports = new ArrayList<>();
-                d1Ports.add(createPort(d1.getId(), "GigabitEthernet0/0/0", "ethernet", 1, "up", "up", 1000000000L));
-                d1Ports.add(createPort(d1.getId(), "GigabitEthernet0/0/1", "ethernet", 2, "up", "up", 1000000000L));
-                d1Ports.add(createPort(d1.getId(), "GigabitEthernet0/0/2", "ethernet", 3, "up", "down", 1000000000L));
-                d1Ports.add(createPort(d1.getId(), "Serial0/0/0", "serial", 4, "up", "up", 2000000L));
-                d1Ports.add(createPort(d1.getId(), "Serial0/0/1", "serial", 5, "down", "down", 2000000L));
-                devicePortRepository.saveAll(d1Ports);
-
-                List<DevicePort> d2Ports = new ArrayList<>();
-                d2Ports.add(createPort(d2.getId(), "Ethernet0/0/1", "ethernet", 1, "up", "up", 100000000L));
-                d2Ports.add(createPort(d2.getId(), "Ethernet0/0/2", "ethernet", 2, "up", "up", 100000000L));
-                d2Ports.add(createPort(d2.getId(), "Ethernet0/0/3", "ethernet", 3, "up", "up", 100000000L));
-                d2Ports.add(createPort(d2.getId(), "Ethernet0/0/4", "ethernet", 4, "up", "down", 100000000L));
-                d2Ports.add(createPort(d2.getId(), "Ethernet0/0/5", "ethernet", 5, "up", "up", 100000000L));
-                d2Ports.add(createPort(d2.getId(), "Ethernet0/0/6", "ethernet", 6, "up", "up", 100000000L));
-                d2Ports.add(createPort(d2.getId(), "Ethernet0/0/7", "ethernet", 7, "up", "up", 100000000L));
-                d2Ports.add(createPort(d2.getId(), "Ethernet0/0/8", "ethernet", 8, "up", "up", 100000000L));
-                devicePortRepository.saveAll(d2Ports);
-
-                List<DevicePort> d3Ports = new ArrayList<>();
-                d3Ports.add(createPort(d3.getId(), "GigabitEthernet0/0/0", "ethernet", 1, "up", "down", 1000000000L));
-                d3Ports.add(createPort(d3.getId(), "GigabitEthernet0/0/1", "ethernet", 2, "up", "down", 1000000000L));
-                d3Ports.add(createPort(d3.getId(), "GigabitEthernet0/0/2", "ethernet", 3, "up", "down", 1000000000L));
-                devicePortRepository.saveAll(d3Ports);
-            }
-
-            System.out.println("=== 测试数据已初始化 ===");
-            System.out.println("默认账号: admin / Admin@123");
         };
     }
 
-    private DevicePort createPort(Long deviceId, String portName, String portType, 
-                                   Integer ifIndex, String adminStatus, String operStatus, Long speed) {
-        DevicePort port = new DevicePort();
-        port.setDeviceId(deviceId);
-        port.setPortName(portName);
-        port.setPortType(portType);
-        port.setIfIndex(ifIndex);
-        port.setAdminStatus(adminStatus);
-        port.setOperStatus(operStatus);
-        port.setSpeed(speed);
-        port.setMtu(1500);
-        port.setDescription(portName + " 接口");
-        return port;
-    }
 }

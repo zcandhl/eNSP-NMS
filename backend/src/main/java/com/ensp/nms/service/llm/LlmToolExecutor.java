@@ -28,8 +28,13 @@ import java.util.Objects;
 import java.util.Set;
 
 /**
- * 页内半闭环工具执行：白名单映射到现有 AIOps/配置/告警服务。
- */
+ * 页内半闭环工具执行：白名单映射到现有AIOps/配置/告警服务。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15 */
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -109,9 +114,6 @@ public class LlmToolExecutor {
     private final com.ensp.nms.service.aiops.HealthScoreService healthScoreService;
     private final com.ensp.nms.service.BackupScheduleService backupScheduleService;
 
-    /**
-     * @param confirmed 写操作必须为 true；只读工具可放宽
-     */
     public Map<String, Object> execute(String name, Map<String, Object> args, boolean confirmed) {
         Map<String, Object> result = new LinkedHashMap<>();
         String tool = name == null ? "" : name.trim().toLowerCase(Locale.ROOT);
@@ -138,7 +140,7 @@ public class LlmToolExecutor {
             return result;
         }
 
-        // 回滚永不作为无人值守自动动作（即使 confirmed，也禁止 autoUnattended 标记）
+        // 回滚永不作为无人值守自动动作
         if ("restore_latest".equals(tool) && Boolean.TRUE.equals(a.get("autoUnattended"))) {
             result.put("ok", false);
             result.put("error", "无人值守禁止自动回滚配置，请人工确认执行");
@@ -682,7 +684,7 @@ public class LlmToolExecutor {
         m.put("autoChange", false);
         m.put("message", deviceId != null
                 ? ("已生成 " + steps.size() + " 步配置建议（绑定设备 #" + deviceId + "）")
-                : ("已生成 " + steps.size() + " 步通用配置建议（未绑定设备，按 eNSP/华为 CLI 模板）"));
+                : ("已生成 " + steps.size() + " 步通用配置建议（未绑定设备，按华为 CLI 模板）"));
         m.put("detail", detail);
         return m;
     }
@@ -1075,7 +1077,6 @@ public class LlmToolExecutor {
         return n;
     }
 
-    /** @return [added, removed, unchanged] 基于行集合的粗粒度摘要 */
     private static int[] summarizeLineDiff(String left, String right) {
         Set<String> a = new java.util.HashSet<>();
         Set<String> b = new java.util.HashSet<>();

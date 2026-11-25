@@ -10,6 +10,15 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * 设备分组列表、成员维护与成员预览接口。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15
+ */
+
 @RestController
 @RequestMapping("/api/device-groups")
 @RequiredArgsConstructor

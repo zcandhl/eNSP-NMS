@@ -18,6 +18,14 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+/**
+ * 登录、登出、当前用户信息与修改密码接口。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15 */
+
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
@@ -140,7 +148,7 @@ public class AuthController {
         if (user == null) {
             return ResponseEntity.status(401).body(Map.of("message", "用户不存在"));
         }
-        // 重新签发 JWT，避免 RBAC 权限变更后前端已刷新权限、接口仍用旧 token 导致 403
+        // 重新签发JWT，避免RBAC权限变更后前端已刷新权限、接口仍用旧token导致403
         return ResponseEntity.ok(buildUserBody(user, jwtService.generateToken(user)));
     }
 

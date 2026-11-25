@@ -8,6 +8,15 @@ import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 
+/**
+ * 无人值守步骤数据访问仓库：封装对应实体的持久化查询与写入。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15
+ */
+
 public interface AiopsUnattendedStepRepository extends JpaRepository<AiopsUnattendedStep, Long> {
 
     List<AiopsUnattendedStep> findByRunIdOrderBySeqAsc(Long runId);

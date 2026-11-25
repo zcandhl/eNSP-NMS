@@ -25,6 +25,14 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.*;
 
+/**
+ * 网段扫描、ARP 邻居发现与候选设备导入。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15 */
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -40,13 +48,9 @@ public class DeviceDiscoveryService {
     private final ExecutorService jobExecutor = Executors.newCachedThreadPool();
     private final ConcurrentHashMap<String, DiscoverJobStatus> jobs = new ConcurrentHashMap<>();
 
-    /** 网段扫描之外的附加探测 IP（逗号分隔）。用于管理地址不在管理网段的设备，如出口路由器 10.20.255.21。 */
     @Value("${nms.discovery.extra-ips:}")
     private String extraIpsConfig;
 
-    /**
-     * 启动异步扫描任务，仅返回候选设备，不自动入库。
-     */
     public DiscoverJobStatus startScan(String network, int timeoutSeconds, String community, int snmpPort) {
         cleanupExpiredJobs();
         if (jobs.size() >= MAX_JOBS) {
@@ -78,9 +82,6 @@ public class DeviceDiscoveryService {
         return job == null ? Optional.empty() : Optional.of(snapshot(job));
     }
 
-    /**
-     * 兼容旧接口：扫描并自动导入新设备。
-     */
     public List<Device> discoverDevices(String network, int timeoutSeconds) {
         return discoverDevices(network, timeoutSeconds, "public", 161);
     }
@@ -99,11 +100,6 @@ public class DeviceDiscoveryService {
         return importCandidates(candidates, null);
     }
 
-    /**
-     * 发现设备入库并绑定工程。
-     * projectId 为空/负数时不绑定（归入「未分配」）；已存在的设备只在「未分配」时补绑，
-     * 不抢占已归属其他工程的设备。
-     */
     @Transactional
     public List<Device> importCandidates(List<DiscoverCandidate> candidates, Long projectId) {
         Long bindProject = (projectId != null && projectId > 0) ? projectId : null;
@@ -134,7 +130,7 @@ public class DeviceDiscoveryService {
             }
             String name = c.getName() != null && !c.getName().isBlank() ? c.getName().trim() : ("Device-" + ip);
             device.setName(name);
-            device.setModel(blankToDefault(c.getModel(), "eNSP Device"));
+            device.setModel(blankToDefault(c.getModel(), "Unknown Device"));
             device.setVendor(blankToDefault(c.getVendor(), "Huawei"));
             device.setStatus("online");
             String deviceType = blankToDefault(c.getDeviceType(), "other");
@@ -164,9 +160,6 @@ public class DeviceDiscoveryService {
         return saved;
     }
 
-    /**
-     * 从已纳管且具备拓扑发现能力的交换机/路由器 ARP 表中发现终端（虚拟 PC）候选。
-     */
     public List<DiscoverCandidate> discoverEndpointsFromArp() {
         List<Device> sources = deviceRepository.findAll().stream()
                 .filter(d -> "online".equals(d.getStatus()))
@@ -199,7 +192,7 @@ public class DeviceDiscoveryService {
                     candidate.setIpAddress(neighborIp);
                     candidate.setName("PC-" + neighborIp);
                     candidate.setModel("Virtual PC");
-                    candidate.setVendor("eNSP");
+                    candidate.setVendor("Virtual");
                     candidate.setDeviceType(DeviceType.PC.getCode());
                     candidate.setMonitorMode(MonitorMode.ICMP.getCode());
                     candidate.setDiscoverSource("arp_endpoint");
@@ -227,13 +220,13 @@ public class DeviceDiscoveryService {
             String ip = baseIp + i;
             futures.add(scanExecutor.submit(() -> scanIp(ip, snmpPort, community)));
         }
-        // 附加探测 IP：管理地址不在扫描网段内的设备（如出口路由 LoopBack）
+        // 附加探测IP：管理地址不在扫描网段内的设备
         for (String extraIp : extraIps) {
             futures.add(scanExecutor.submit(() -> scanIp(extraIp, snmpPort, community)));
         }
 
-        // 每个地址最多要试两种 community（主值 + 大小写变体），耗时略高于单次探测；
-        // 这里给 timeout 额外 20s 宽限，避免按裸 timeout 硬卡时把队列尾部的地址整段取消。
+        // 每个地址最多要试两种community，耗时略高于单次探测
+        // 这里给timeout额外20s宽限，避免按裸timeout硬卡时把队列尾部的地址整段取消。
         long deadlineNs = System.nanoTime() + TimeUnit.SECONDS.toNanos(timeoutSeconds + 20L);
         try {
             for (Future<DiscoverCandidate> future : futures) {
@@ -275,17 +268,17 @@ public class DeviceDiscoveryService {
     }
 
     private DiscoverCandidate scanIp(String ip, int snmpPort, String community) {
-        // 设备侧 community 区分大小写：AC6005 有复杂度校验，只允许 Public（小写 public 被拒绝），
-        // 而网管默认配置是 public。若主 community 无响应，再按首字母大写变体复检一次，
-        // 命中后把「实际生效」的 community 写进候选，避免入库后方站一直离线。
+        // 设备侧community区分大小写：部分AC设备有复杂度校验，只允许Public
+        // 而网管默认配置是public。若主community无响应，再按首字母大写变体复检一次
+        // 命中后把「实际生效」的community写进候选，避免入库后站点一直离线。
         List<String> candidates = communityCandidates(community);
         DiscoverCandidate hit = scanIpWithCommunity(ip, snmpPort, candidates.get(0), 2000, 1);
         if (hit != null) {
             return hit;
         }
-        // 变体用短超时+不重试：局域网往返通常 < 50ms，600ms 足够，
-        // 且能避免 254 个地址 × 两轮探测把整轮扫描时间翻倍。
-        // 但 eNSP 的 AC6005 agent 在扫描风暴下响应会抖到 600ms 以上，给到 1200ms 一次机会。
+        // 变体用短超时+不重试：局域网往返通常 < 50ms，600ms足够
+        // 且能避免254个地址 × 两轮探测把整轮扫描时间翻倍。
+        // 但部分AC设备agent在扫描风暴下响应会抖到600ms以上，给到1200ms一次机会。
         for (int i = 1; i < candidates.size(); i++) {
             hit = scanIpWithCommunity(ip, snmpPort, candidates.get(i), 1200, 0);
             if (hit != null) {
@@ -313,15 +306,15 @@ public class DeviceDiscoveryService {
 
     private DiscoverCandidate scanIpWithCommunity(String ip, int snmpPort, String community, int timeoutMs, int retries) {
         try {
-            // eNSP 虚拟机常不响应 ICMP，直接 SNMP 探测
+            // 部分设备常不响应ICMP，直接SNMP探测
             if (!snmpClient.isReachable(ip, snmpPort, community, timeoutMs, retries)) {
                 return null;
             }
             Map<String, String> deviceInfo = snmpClient.getDeviceInfo(ip, snmpPort, community);
 
-            // 只认"设备本机接口地址"：VRRP 虚拟网关（如 10.20.10.254）也会响应 SNMP，
-            // 但它的地址不在对端 ipAdEntAddr 表里，若不剔除会多出一台假设备。
-            // walk 失败（返回空）时不做判断，退回原行为，避免因权限/超时误杀真实设备。
+            // 只认"设备本机接口地址"：VRRP虚拟网关也会响应SNMP
+            // 但它的地址不在对端ipAdEntAddr表里，若不剔除会多出一台假设备。
+            // walk失败时不做判断，退回原行为，避免因权限/超时误杀真实设备。
             List<Map<String, String>> addrRows = snmpClient.walk(ip, snmpPort, community, "1.3.6.1.2.1.4.20.1.1");
             if (!addrRows.isEmpty()) {
                 boolean owned = false;
@@ -351,7 +344,7 @@ public class DeviceDiscoveryService {
             String sysDescr = deviceInfo.getOrDefault("description", "");
             String sysObjectId = deviceInfo.getOrDefault("sysObjectId", "");
             String deviceType = deviceCapabilityService.detectTypeCode(sysName, sysDescr, sysObjectId, null);
-            // 设备名直接用 sysName（与拓扑、CLI 一致），不再拼 IP 后缀
+            // 设备名直接用sysName，不再拼IP后缀
             candidate.setName(sysName);
             candidate.setModel(parseModel(sysDescr));
             candidate.setVendor("Huawei");
@@ -369,25 +362,20 @@ public class DeviceDiscoveryService {
         }
     }
 
-    /**
-     * 从 sysDescr 第一行解析型号：eNSP 回显形如
-     * "S5700-28C-HI \r\nHuawei Versatile Routing Platform Software..." 或
-     * "Huawei AR2220 Huawei Versatile Routing Platform Software..."。
-     */
     private String parseModel(String sysDescr) {
         if (sysDescr == null || sysDescr.isBlank()) {
-            return "eNSP Device";
+            return "Unknown Device";
         }
         String firstLine = sysDescr.split("\\r?\\n")[0].trim();
         String[] parts = firstLine.split("\\s+");
         if (parts.length == 0) {
-            return "eNSP Device";
+            return "Unknown Device";
         }
         String first = parts[0];
         if ("Huawei".equalsIgnoreCase(first) && parts.length > 1) {
             return parts[1];
         }
-        return first.length() <= 32 ? first : "eNSP Device";
+        return first.length() <= 32 ? first : "Unknown Device";
     }
 
     private DiscoverJobStatus awaitJob(String jobId, int maxWaitSeconds) {        long deadline = System.currentTimeMillis() + TimeUnit.SECONDS.toMillis(Math.max(maxWaitSeconds, 10));
@@ -432,7 +420,6 @@ public class DeviceDiscoveryService {
         return copy;
     }
 
-    /** 解析附加扫描 IP 配置：逗号/分号分隔，去重去空，仅保留合法 IPv4 */
     private List<String> resolveExtraIps() {
         if (extraIpsConfig == null || extraIpsConfig.isBlank()) {
             return List.of();
@@ -463,7 +450,7 @@ public class DeviceDiscoveryService {
         }
         String[] parts = network.trim().split("\\.");
         if (parts.length < 3) {
-            throw new RuntimeException("网段格式无效，例如: 192.168.56.0");
+            throw new RuntimeException("网段格式无效，例如: 192.168.1.0");
         }
         return parts[0] + "." + parts[1] + "." + parts[2] + ".";
     }

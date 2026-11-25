@@ -12,9 +12,13 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * 实验室拓扑链路自动扫描：定时对在线设备做 LLDP/CDP/华为LLDP + ARP 发现。
- * 默认开启；可通过 nms.topology.auto-discover-enabled=false 关闭。
- */
+ * 拓扑链路自动扫描：定时对在线设备做LLDP/CDP/华为LLDP与ARP发现，可配置关闭。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15 */
+
 @Slf4j
 @Component
 @RequiredArgsConstructor

@@ -16,6 +16,15 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * 用户账号、密码、锁定状态与有效权限管理接口。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15
+ */
+
 @RestController
 @RequestMapping("/api/users")
 @RequiredArgsConstructor

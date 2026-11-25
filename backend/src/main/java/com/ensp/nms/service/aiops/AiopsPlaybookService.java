@@ -22,8 +22,13 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * 真实可执行处置动作与事件时间线（不含跳转式演示步骤）。
- */
+ * 可执行处置动作与事件时间线。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15 */
+
 @Slf4j
 @Service
 public class AiopsPlaybookService {
@@ -59,9 +64,6 @@ public class AiopsPlaybookService {
         this.alarmService = alarmService;
     }
 
-    /**
-     * 仅返回会改库/改状态的真实动作（无 open_* / 跳转步骤）。
-     */
     @Transactional(readOnly = true)
     public Map<String, Object> buildPlaybook(Long deviceId, Long alarmId) {
         Alarm alarm = alarmId != null ? alarmRepository.findById(alarmId).orElse(null) : null;
@@ -184,7 +186,6 @@ public class AiopsPlaybookService {
         return result;
     }
 
-    /** 仅执行真实动作；跳转类动作一律拒绝 */
     public Map<String, Object> executeStep(String action, Long deviceId, Long alarmId,
                                            boolean confirmed, String question) {
         Map<String, Object> result = new LinkedHashMap<>();
@@ -225,7 +226,7 @@ public class AiopsPlaybookService {
                     result.put("rca", rca);
                 }
                 default -> {
-                    return fail(result, "不支持演示/跳转动作: " + action + "（仅允许真实写库动作）");
+                    return fail(result, "不支持跳转动作: " + action + "（仅允许写库动作）");
                 }
             }
         } catch (Exception e) {
@@ -235,9 +236,6 @@ public class AiopsPlaybookService {
         return result;
     }
 
-    /**
-     * 工作台焦点聚合：场景 + 推荐工具 + 影响范围 + 证据摘要。
-     */
     @Transactional(readOnly = true)
     public Map<String, Object> buildWorkbenchFocus(Long alarmId, Long deviceId) {
         Alarm alarm = alarmId != null ? alarmRepository.findById(alarmId).orElse(null) : null;
@@ -343,7 +341,6 @@ public class AiopsPlaybookService {
                 }
             }
         } catch (Exception ignored) {
-            /* ignore */
         }
         evidence.put("rcaHints", rcaHints);
 
@@ -362,7 +359,7 @@ public class AiopsPlaybookService {
         result.put("closed", closed);
         result.put("inProgress", inProgress);
         result.put("phase", closed ? "closed" : (inProgress ? "in_progress" : "pending"));
-        // handled 仅=已关闭（兼容旧前端；ACK≠办结）
+        // handled仅=已关闭
         result.put("handled", closed);
         result.put("correlationNote", alarm != null ? alarm.getCorrelationNote() : null);
         result.put("correlationType", alarm != null ? alarm.getCorrelationType() : null);
@@ -376,7 +373,6 @@ public class AiopsPlaybookService {
         return result;
     }
 
-    /** 供 LLM 启发式兜底：场景推荐工具 */
     public List<Map<String, Object>> buildRecommendedTools(String scenario, Long deviceId, Long alarmId) {
         return buildRecommendedTools(scenario, deviceId, alarmId, false, null, null);
     }
@@ -386,9 +382,6 @@ public class AiopsPlaybookService {
         return buildRecommendedTools(scenario, deviceId, alarmId, closed, null, null);
     }
 
-    /**
-     * 按状态重排主按钮：阅知关闭 / 离线刷新 / 标准处置 / 复核。
-     */
     public List<Map<String, Object>> buildRecommendedTools(String scenario, Long deviceId, Long alarmId,
                                                            boolean closed, Alarm alarm, Device device) {
         List<Map<String, Object>> tools = new ArrayList<>();

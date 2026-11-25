@@ -29,6 +29,14 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
+/**
+ * 告警创建、查询、确认办结与设备信息补充处理。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15 */
+
 @Slf4j
 @Service
 public class AlarmService {
@@ -55,20 +63,19 @@ public class AlarmService {
         return alarmProperties != null && alarmProperties.isAckClosesType(trapType);
     }
 
-    /** 是否阅知关闭：性能阈值告警、trapType 白名单、INFO 级别，或标题命中常见阅知事件 */
     public boolean isAckClosesAlarm(Alarm alarm) {
         if (alarm == null) {
             return false;
         }
         String type = alarm.getTrapType() != null ? alarm.getTrapType().trim() : "";
         String title = alarm.getTitle() != null ? alarm.getTitle().trim() : "";
-        // 性能阈值告警（性能模块模拟采集，越限未恢复时会自动重报/复活）按阅知类处理：
+        // 性能阈值告警按阅知类处理
         // 阅知关闭后若指标仍在阈值外，性能模块会再次同步生成，不会漏报。
-        // 需放在排除规则之前：如「性能告警-CPU阈值」按字面会被下方 CPU 排除规则拦截。
+        // 需放在排除规则之前：如「性能告警-CPU阈值」按字面会被下方CPU排除规则拦截。
         if ("PERFORMANCE".equals(type) || type.startsWith("性能告警-")) {
             return true;
         }
-        // 明确排除需跟进类（即使误标 INFO 也不阅知关闭）
+        // 明确排除需跟进类
         if (type.contains("认证失败") || title.contains("认证失败")
                 || "DEVICE_OFFLINE".equals(type) || title.contains("设备离线")
                 || type.contains("冷启动") || title.contains("冷启动")
@@ -120,11 +127,6 @@ public class AlarmService {
         return createAlarmFromTrap(deviceIp, null, null, title, description, severity, rawData, trapType);
     }
 
-    /**
-     * Trap 告警：管理 IP → 接口别名(IP) → sysName；
-     * 命中后 deviceIp 一律写设备管理 IP（非 Trap 接口地址 / Cloud 源地址）。
-     * 同设备+类型+标题在抑制窗口内重复时合并计数，避免抖动刷屏。
-     */
     @Transactional
     public Alarm createAlarmFromTrap(String peerIp, String agentIp, String sysName,
                                      String title, String description,
@@ -200,11 +202,10 @@ public class AlarmService {
         return saved;
     }
 
-    /** Trap 抖动抑制窗口（分钟） */
     public static final int TRAP_SUPPRESS_WINDOW_MINUTES = 5;
 
     private Optional<Device> resolveManagedDevice(String peerIp, String agentIp, String sysName) {
-        // 1) 管理 IP 精确命中
+        // 1) 管理IP精确命中
         if (agentIp != null && !agentIp.isBlank()) {
             Optional<Device> byAgent = deviceRepository.findByIpAddress(agentIp);
             if (byAgent.isPresent()) {
@@ -218,7 +219,7 @@ public class AlarmService {
             }
         }
 
-        // 2) 接口/环回别名（如 Trap 带 10.1.1.1，纳管为 10.10.10.4）
+        // 2) 接口/环回别名
         if (agentIp != null && !agentIp.isBlank()) {
             Optional<Device> byAlias = deviceIpAliasService.findDeviceByAnyIp(agentIp);
             if (byAlias.isPresent()) {
@@ -238,7 +239,7 @@ public class AlarmService {
             return byName;
         }
 
-        // 4) 别名未缓存时，现场 SNMP 采 ipAddrTable 再匹配（教学拓扑设备少，可接受）
+        // 4) 别名未缓存时，现场SNMP采ipAddrTable再匹配
         if (agentIp != null && !agentIp.isBlank()) {
             Optional<Device> refreshed = deviceIpAliasService.resolveByRefreshingAliases(agentIp);
             if (refreshed.isPresent()) {
@@ -264,7 +265,7 @@ public class AlarmService {
         if (contains.size() == 1) {
             return Optional.of(contains.get(0));
         }
-        // 设备名含 IP 后缀如 "SW1-192.168.1.1"：sysName 与名称互相包含时取唯一
+        // 设备名含IP后缀如 "SW1-192.168.1.1"：sysName与名称互相包含时取唯一
         List<Device> all = deviceRepository.findAll();
         List<Device> fuzzy = new java.util.ArrayList<>();
         for (Device d : all) {
@@ -322,7 +323,6 @@ public class AlarmService {
         return null;
     }
 
-    /** 去掉 udp:、端口、空白，统一为纯 IP */
     public static String normalizeDeviceIp(String raw) {
         if (raw == null) return null;
         String s = raw.trim();
@@ -338,7 +338,7 @@ public class AlarmService {
         if (slash > 0) {
             s = s.substring(0, slash);
         }
-        // [2001:db8::1]:162 简化不处理，常见为 IPv4
+        // [2001:db8::1]:162简化不处理，常见为IPv4
         int bracket = s.indexOf(']');
         if (s.startsWith("[") && bracket > 0) {
             s = s.substring(1, bracket);
@@ -346,13 +346,8 @@ public class AlarmService {
         return s.trim();
     }
 
-    /** 未分页列表上限，避免全表加载 */
     public static final int UNBOUNDED_LIST_LIMIT = 500;
 
-    /**
-     * @deprecated 请使用 {@link #getAlarmsPage(Pageable)} 或 {@link #queryAlarms}；
-     *             本方法仅返回最近 {@value #UNBOUNDED_LIST_LIMIT} 条。
-     */
     @Deprecated
     @Transactional
     public List<Alarm> getAllAlarms() {
@@ -367,9 +362,6 @@ public class AlarmService {
         return alarmRepository.findAll(pageable);
     }
 
-    /**
-     * 告警列表筛选分页：状态/级别/关键字/时间范围。
-     */
     @Transactional
     public Page<Alarm> queryAlarms(List<Alarm.Status> statuses,
                                    Alarm.Severity severity,
@@ -380,9 +372,6 @@ public class AlarmService {
         return queryAlarms(statuses, severity, keyword, from, to, false, 30, pageable);
     }
 
-    /**
-     * @param overdueOnly 仅未确认且超过 overdueMinutes 仍 ACTIVE 的告警
-     */
     @Transactional
     public Page<Alarm> queryAlarms(List<Alarm.Status> statuses,
                                    Alarm.Severity severity,
@@ -408,7 +397,6 @@ public class AlarmService {
         return queryAlarms(statuses, severity, keyword, from, to, overdueOnly, overdueMinutes, deviceId, null, pageable);
     }
 
-    /** projectId 非空时按工程过滤（借 device join 的 project_id）；-1 约定为"未分配工程" */
     @Transactional
     public Page<Alarm> queryAlarms(List<Alarm.Status> statuses,
                                    Alarm.Severity severity,
@@ -461,8 +449,8 @@ public class AlarmService {
                 preds.add(cb.lessThan(root.get("occurredAt"), overdueBefore));
             }
             if (deviceId != null) {
-                // 仅：本设备关联告警，或尚未绑定设备但 IP 与本设备管理 IP 一致的孤儿告警。
-                // 勿用「任意 deviceIp=管理IP」——会把其它设备上同 IP 字符串的告警一并拉进来，导致拓扑与告警管理不一致。
+                // 仅：本设备关联告警，或尚未绑定设备但IP与本设备管理IP一致的孤儿告警。
+                // 勿用「任意deviceIp=管理IP」——会把其它设备上同IP字符串的告警一并拉进来，导致拓扑与告警管理不一致。
                 if (deviceIpFilter != null && !deviceIpFilter.isBlank()) {
                     preds.add(cb.or(
                             cb.equal(deviceJoin.get("id"), deviceId),
@@ -507,7 +495,6 @@ public class AlarmService {
         return page;
     }
 
-    /** 解析 1h / 6h / 24h / 7d → 起始时间 */
     public static LocalDateTime resolveTimeRangeStart(String timeRange) {
         if (timeRange == null || timeRange.isBlank()) {
             return null;
@@ -551,9 +538,6 @@ public class AlarmService {
         return opt;
     }
 
-    /**
-     * 历史「通用Trap告警」纠偏类型/标题，并重写堆砌式描述为运维可读文案。
-     */
     private void refineGenericTrapTypes(List<Alarm> alarms) {
         if (alarms == null || alarms.isEmpty()) {
             return;
@@ -581,7 +565,7 @@ public class AlarmService {
                 dirty = true;
             }
 
-            // 描述纠偏：旧分号堆砌 / 误标 v3用户 / 仍写通用类型
+            // 描述纠偏：旧分号堆砌 / 误标v3用户 / 仍写通用类型
             if (alarm.getRawData() != null && !alarm.getRawData().isBlank()
                     && TrapOidClassifier.needsDescriptionRebuild(alarm.getDescription())) {
                 String repeat = TrapOidClassifier.extractRepeatSuffix(alarm.getDescription());
@@ -639,7 +623,6 @@ public class AlarmService {
         return queryAlarms(null, null, null, null, null, false, 30, deviceId, pageable);
     }
 
-    /** 对历史告警：按 IP / 描述中的 Agent·sysName 重匹配，并把 deviceIp 纠正为管理 IP */
     private void enrichDeviceLinks(List<Alarm> alarms) {
         if (alarms == null || alarms.isEmpty()) return;
         for (Alarm alarm : alarms) {
@@ -677,7 +660,7 @@ public class AlarmService {
                         sysName
                 );
             }
-            // 仍是接口 IP（如 10.1.1.1）时：现场采别名再纠正
+            // 仍是接口IP时：现场采别名再纠正
             if (device.isEmpty() && normalized != null && !normalized.isBlank()) {
                 device = deviceIpAliasService.resolveByRefreshingAliases(normalized);
             }
@@ -723,7 +706,6 @@ public class AlarmService {
         return null;
     }
 
-    /** 从 Trap 原始 VB 文本中提取 OID 对应值，例如 "1.3.6.1.2.1.1.5.0 = SW1" */
     private String extractOidValue(String rawData, String oidHint) {
         if (rawData == null || oidHint == null || rawData.isBlank()) return null;
         java.util.regex.Matcher m = java.util.regex.Pattern
@@ -798,10 +780,6 @@ public class AlarmService {
         });
     }
 
-    /**
-     * 关闭所有未结案的阅知类（ACTIVE/ACKNOWLEDGED）。
-     * REQUIRES_NEW：独立提交，避免被工作台外层只读/回滚事务吞掉。
-     */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public int closeOpenAckClosesAlarms(String acknowledgedBy, String note) {
         List<Alarm> open = alarmRepository.findByStatusInOrderByOccurredAtDesc(
@@ -890,10 +868,6 @@ public class AlarmService {
         });
     }
 
-    /**
-     * 网管探测确认设备离线后，确保存在未关闭的 DEVICE_OFFLINE 告警。
-     * @param bumpIfExists true=在线→离线刚切换时合并计数；false=已有未关闭告警则直接返回（供稳态离线补缺）
-     */
     @Transactional
     public Optional<Alarm> ensureDeviceOfflineAlarm(Device device, String probeMethod, boolean bumpIfExists) {
         if (device == null || device.getId() == null) {
@@ -906,7 +880,7 @@ public class AlarmService {
         for (Alarm a : open) {
             boolean sameDevice = Objects.equals(a.getDeviceId(), device.getId());
             boolean sameIp = ip != null && !ip.isBlank() && ip.equals(normalizeDeviceIp(a.getDeviceIp()));
-            // 仅匹配整机离线告警，不用 linkDown 等接口告警替代
+            // 仅匹配整机离线告警，不用linkDown等接口告警替代
             if ((sameDevice || sameIp) && isDeviceOfflineAlarm(a)) {
                 if (!bumpIfExists) {
                     return Optional.of(a);
@@ -929,7 +903,7 @@ public class AlarmService {
 
         String probe = probeMethod != null && !probeMethod.isBlank() ? probeMethod : "probe";
         String desc = String.format(
-                "网管探测确认设备不可达（连续失败）。设备=%s，管理IP=%s，探测方式=%s。请检查 eNSP 设备电源/连线或 SNMP/ICMP 可达性。",
+                "网管探测确认设备不可达（连续失败）。设备=%s，管理IP=%s，探测方式=%s。请检查设备电源/连线或 SNMP/ICMP 可达性。",
                 device.getName(), ip != null ? ip : "-", probe.toUpperCase(Locale.ROOT));
         Alarm created = createAlarmFromTrap(
                 ip,
@@ -945,10 +919,6 @@ public class AlarmService {
         return Optional.of(created);
     }
 
-    /**
-     * 对设备做 SNMP ifOperStatus 轮询时发现「曾 up → 现 down」：在本设备上生成接口断开告警。
-     * 数据来自该设备自身 SNMP，不是拓扑猜测，也不是伪造 Trap。
-     */
     @Transactional
     public Optional<Alarm> raiseInterfaceDownFromSnmpPoll(Device device, int ifIndex, String ifName) {
         if (device == null || device.getId() == null) {
@@ -992,10 +962,6 @@ public class AlarmService {
         return Optional.of(created);
     }
 
-    /**
-     * 接口恢复（linkUp Trap 或 SNMP 轮询见到 up）后，关闭同设备同接口未关闭的 linkDown 告警。
-     * @return 清除条数
-     */
     @Transactional
     public int clearLinkDownAlarmsOnLinkUp(Long deviceId, String deviceIp, String ifName, String ifIndex) {
         return clearLinkDownAlarmsOnLinkUp(deviceId, deviceIp, ifName, ifIndex,
@@ -1035,10 +1001,6 @@ public class AlarmService {
         return n;
     }
 
-    /**
-     * 恢复 Trap → 需关闭的故障 trapType 子串列表（设备维度，含 ACTIVE/ACKNOWLEDGED）。
-     * 链路断开单独走 clearLinkDownAlarmsOnLinkUp（需接口匹配）。
-     */
     private static final Map<String, List<String>> RECOVERY_FAULT_TYPE_MARKERS = Map.ofEntries(
             Map.entry("链路告警-BFD恢复", List.of("链路告警-BFD断开", "BFD断开", "BFD会话状态断开")),
             Map.entry("硬件告警-电源恢复", List.of("硬件告警-电源异常", "硬件告警-电源故障", "电源运行异常", "电源模块故障")),
@@ -1047,10 +1009,6 @@ public class AlarmService {
             Map.entry("路由告警-OSPF恢复", List.of("路由告警-OSPF触发", "OSPF路由告警触发"))
     );
 
-    /**
-     * 收到恢复类 Trap 后：关闭同设备对应故障告警（含处理中），并返回清除条数。
-     * 不处理「链路告警-接口恢复」（接口口级匹配见 {@link #clearLinkDownAlarmsOnLinkUp}）。
-     */
     @Transactional
     public int clearFaultAlarmsOnRecoveryTrap(Long deviceId, String deviceIp, String recoveryTrapType, String clearNote) {
         if (recoveryTrapType == null || recoveryTrapType.isBlank()) {
@@ -1070,7 +1028,6 @@ public class AlarmService {
         return clearOpenAlarmsMatchingMarkers(deviceId, deviceIp, markers, note);
     }
 
-    /** 是否为「应写库留痕后立即办结」的瞬时恢复通知 */
     public boolean isTransientRecoveryNotice(String trapType, String title) {
         String type = trapType != null ? trapType.trim() : "";
         String t = title != null ? title.trim() : "";
@@ -1090,7 +1047,7 @@ public class AlarmService {
         if (!r.contains("恢复")) {
             return List.of();
         }
-        // 「硬件告警-电源恢复」→ 尝试「电源」相关故障（已在 map 覆盖）；通用兜底
+        // 「硬件告警-电源恢复」→ 尝试「电源」相关故障；通用兜底
         if (r.contains("BFD")) {
             return List.of("BFD断开", "链路告警-BFD断开");
         }
@@ -1152,9 +1109,6 @@ public class AlarmService {
         return false;
     }
 
-    /**
-     * 清除基线异常（指标回落后）。rawData 存 metric（cpu/memory）。
-     */
     @Transactional
     public int clearBaselineAnomalyAlarms(Long deviceId, String metric, String clearNote) {
         if (deviceId == null) {
@@ -1192,9 +1146,6 @@ public class AlarmService {
         return n;
     }
 
-    /**
-     * 网管阈值回落时：同步清除 Trap 侧 CPU/内存过载残留（双轨）。
-     */
     @Transactional
     public int clearTrapPerformanceOverloadOnMetricRecovery(Long deviceId, String deviceIp, String metric) {
         List<String> markers;
@@ -1221,10 +1172,6 @@ public class AlarmService {
                 || title.toLowerCase(Locale.ROOT).contains("linkdown");
     }
 
-    /**
-     * 判断未关闭的 linkDown 是否与本次恢复事件为同一接口。
-     * 无接口线索时同设备全清；有线索时做宽松匹配（ifIndex / ifName 别名）。
-     */
     private static boolean sameInterfaceHint(Alarm a, String ifName, String ifIndex) {
         boolean hasHint = (ifName != null && !ifName.isBlank()) || (ifIndex != null && !ifIndex.isBlank());
         if (!hasHint) {
@@ -1254,7 +1201,7 @@ public class AlarmService {
             if (blob.contains(name)) {
                 return true;
             }
-            // GigabitEthernet0/0/1 ↔ GE0/0/1 ↔ Gi0/0/1 等常见缩写
+            // GigabitEthernet0/0/1 ↔ GE0/0/1 ↔ Gi0/0/1等常见缩写
             for (String alias : interfaceNameAliases(name)) {
                 if (blob.contains(alias)) {
                     return true;
@@ -1262,7 +1209,7 @@ public class AlarmService {
             }
         }
 
-        // 线索无法对上时：不误清其它口；由「无线索」或 SNMP 稳态对账再处理
+        // 线索无法对上时：不误清其它口；由「无线索」或SNMP稳态对账再处理
         return false;
     }
 
@@ -1308,20 +1255,12 @@ public class AlarmService {
         return aliases;
     }
 
-    /**
-     * SNMP 稳态对账：接口当前为 up 时，关闭该口未结案的 linkDown（含「处理中」），
-     * 不依赖 wasDown→nowUp 边沿，避免漏 Trap / 进程重启后残留。
-     */
     @Transactional
     public int reconcileOpenLinkDownWhileIfUp(Long deviceId, String deviceIp, String ifName, String ifIndex) {
         return clearLinkDownAlarmsOnLinkUp(deviceId, deviceIp, ifName, ifIndex,
                 "SNMP 探测接口已 up，自动关闭残留链路断开告警");
     }
 
-    /**
-     * 设备恢复在线后，清除该设备上未关闭的连通性/离线类告警。
-     * @return 清除条数
-     */
     @Transactional
     public int clearConnectivityAlarmsOnRecovery(Long deviceId, String deviceIp) {
         return clearConnectivityAlarmsOnRecovery(deviceId, deviceIp, null);
@@ -1366,10 +1305,6 @@ public class AlarmService {
         return title.contains("设备离线") || title.toLowerCase(Locale.ROOT).contains("device offline");
     }
 
-    /**
-     * 仅整机可达性/离线类告警。禁止匹配 linkDown 等接口告警（含 "down" 子串），
-     * 否则设备仍在线时的轮询恢复会误清链路断开告警。
-     */
     private static boolean isConnectivityAlarm(Alarm a) {
         return isDeviceOfflineAlarm(a);
     }
@@ -1407,10 +1342,6 @@ public class AlarmService {
         return n;
     }
 
-    /**
-     * 清理孤儿告警：设备已不在库中、但告警仍带其 IP 的历史记录。
-     * 这些记录会让「今日告警 / 近 7 天 / 按级别」等统计长期虚高。
-     */
     @Transactional
     public int purgeOrphanAlarms() {
         int n = alarmRepository.deleteOrphanAlarms();
@@ -1430,7 +1361,7 @@ public class AlarmService {
         long weekCount = alarmRepository.countByOccurredAtBetween(weekStart, now);
         long monthCount = alarmRepository.countByOccurredAtBetween(monthStart, now);
 
-        // 级别分布：一次 GROUP BY 代替多次 countBySeverity
+        // 级别分布：一次GROUP BY代替多次countBySeverity
         Map<Alarm.Severity, Long> severityCounts = toEnumCountMap(
                 alarmRepository.countGroupBySeverity(), Alarm.Severity.class);
         long criticalCount = severityCounts.getOrDefault(Alarm.Severity.CRITICAL, 0L);
@@ -1457,7 +1388,7 @@ public class AlarmService {
             }
         }
 
-        // 近 24 小时按小时聚合（DB GROUP BY，不再加载全部告警到内存）
+        // 近24小时按小时聚合
         LocalDateTime trendStart = now.minusHours(23).withMinute(0).withSecond(0).withNano(0);
         List<Object[]> hourlyRows = alarmRepository.countGroupByHourSince(trendStart);
         Map<String, Long> hourlyMap = new java.util.HashMap<>();
@@ -1481,7 +1412,7 @@ public class AlarmService {
             ));
         }
 
-        // 状态分布：一次 GROUP BY
+        // 状态分布：一次GROUP BY
         Map<Alarm.Status, Long> statusCounts = toEnumCountMap(
                 alarmRepository.countGroupByStatus(), Alarm.Status.class);
         long activeCount = statusCounts.getOrDefault(Alarm.Status.ACTIVE, 0L);
@@ -1536,9 +1467,6 @@ public class AlarmService {
         return map;
     }
 
-    /**
-     * 性能阈值告警同步到统一告警表，供告警中心 / 拓扑告警 Tab 展示。
-     */
     @Transactional
     public void syncPerformanceThresholdAlarm(Device device, String metric, String level,
                                               String message, Double value, Double threshold) {
@@ -1599,7 +1527,7 @@ public class AlarmService {
             }
             alarmRepository.save(alarm);
         }
-        // 双轨：同步清 Trap 侧过载告警，避免 PERFORMANCE 已关但 Trap 过载仍「处理中」
+        // 双轨：同步清Trap侧过载告警，避免PERFORMANCE已关但Trap过载仍「处理中」
         try {
             Device d = deviceRepository.findById(deviceId).orElse(null);
             String ip = d != null ? d.getIpAddress() : null;
@@ -1609,7 +1537,6 @@ public class AlarmService {
         }
     }
 
-    /** 性能页确认阈值告警时，同步统一告警为已确认 */
     @Transactional
     public void acknowledgePerformanceThresholdAlarm(Long deviceId, String metric, String acknowledgedBy) {
         if (deviceId == null || metric == null) {
@@ -1626,10 +1553,6 @@ public class AlarmService {
         }
     }
 
-    /**
-     * 告警中心处置 PERFORMANCE 类型时，回写 performance_alerts，避免双轨状态不一致。
-     * rawData 存 metric（cpu/memory）。
-     */
     private void syncLinkedPerformanceAlert(Alarm alarm, String action) {
         if (alarm == null || !"PERFORMANCE".equalsIgnoreCase(alarm.getTrapType())) {
             return;

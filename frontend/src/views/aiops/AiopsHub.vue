@@ -1,3 +1,13 @@
+/**
+ * @file    AiopsHub.vue
+ * @module  视图页/智能运维
+ * @desc    智能运维功能导航枢纽页。
+ *
+ * @author  ZC
+ * @date    2026-08-15 * @version 1.0.0
+ * @requires element-plus, vue, vue-router, @/api/device, @/composables/askOpsAssistant, @/composables/inspectReportStore
+ */
+
 <template>
   <div class="nms-page aiops-hub">
     <div class="nms-page-header">
@@ -34,7 +44,7 @@
       </div>
     </div>
 
-    <!-- 巡检报告留在智能运维本页，不灌进运维助手 -->
+    
     <el-drawer
       v-model="reportOpen"
       title="智能巡检报告"
@@ -103,7 +113,7 @@ async function refreshHubStatus() {
     opsMode.value = pol?.llmOpsMode === 'unattended' ? 'unattended' : 'manual'
     paused.value = !!(pol?.unattendedPaused ?? st?.paused)
     circuitOpen.value = !!st?.circuitOpen
-  } catch { /* ignore */ }
+  } catch {  }
 }
 
 function formatTime(v) {
@@ -136,7 +146,6 @@ function goWorkbenchFromReport() {
   router.push('/aiops/workbench')
 }
 
-/** 用户主动要求时，才把报告摘要交给助手解读 */
 function askPatrolAnalyze() {
   const rpt = lastReport.value
   const brief = rpt?.summary

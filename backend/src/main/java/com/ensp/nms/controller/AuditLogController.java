@@ -12,6 +12,15 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
 
+/**
+ * 操作审计日志查询与详情接口。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15
+ */
+
 @RestController
 @RequestMapping("/api/audit-logs")
 @RequiredArgsConstructor

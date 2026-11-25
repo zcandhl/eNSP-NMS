@@ -5,7 +5,6 @@
  * 原则：只要真实接口可用就不走这里；一旦降级，界面顶部会显示"演示数据"标记，不伪装真实。
  */
 
-// ── 9 类检查原语（后端 GET /api/acceptance/check-types 的等价结构）────────────
 // 前端不按原语写死表单，全部依据 fields 渲染，新增第 10 类只加一条数据。
 import { describeCheck } from '../views/acceptance/components/judgeRule'
 
@@ -115,7 +114,6 @@ export const CHECK_TYPES = [
   }
 ]
 
-// ── 项目与方案 ─────────────────────────────────────────────────────────
 const PROJECTS = [
   {
     id: 1,
@@ -230,7 +228,6 @@ const PLANS = [
   }
 ]
 
-// ── 原始命令输出样例（报告"实测数据"来源）──────────────────────────────
 const RAW_OUTPUT = {
   1: `# 拓扑采集 · LLDP 汇总\n节点 17 / 链路 27\n已纳管 17 台，缺失 0 台\n匹配设计拓扑：17/17`,
   2: `# CORE-1 · display ospf peer brief\nArea 0.0.0.0 interface Vlanif90\n\nRouter ID       Address         State     Interface\n10.20.255.2     10.20.255.10    Full      Vlanif90\n10.20.255.21    10.20.255.1     Full      Vlanif91\n10.20.255.3     10.20.255.5     Full      Vlanif92\n\nFull 邻居合计：11`,
@@ -241,7 +238,6 @@ const RAW_OUTPUT = {
   7: `# ACC-6F · display ntp-service status\nClock status: unsynchronized\nClock stratum: 16`
 }
 
-// ── 批次（含一次历史批次，用于复检对比）──────────────────────────────────
 function makeItems(plan, statusMap) {
   return plan.checks.filter((c) => c.enabled).map((c) => {
     const st = statusMap[c.code] || 'PASS'
@@ -299,7 +295,6 @@ const BATCHES = [
   }
 ]
 
-// ── 内存实现 ───────────────────────────────────────────────────────────
 let seq = 13
 const runtime = new Map() // batchId -> batch
 

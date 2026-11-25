@@ -28,6 +28,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+/**
+ * 智能运维总览聚合、屏幕摘要、看板与无人值守周期调度。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15 */
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -54,7 +62,6 @@ public class AiopsService {
     private final LlmSettingsService llmSettingsService;
     private final com.ensp.nms.repository.PerformanceDataRepository performanceDataRepository;
 
-    /** 最近一次巡检结构化证据（工作台/大屏展示） */
     private volatile Map<String, Object> lastInspectEvidence = Map.of();
     private volatile String lastScreenBrief = "";
     private volatile LocalDateTime lastScreenBriefAt = null;
@@ -65,9 +72,6 @@ public class AiopsService {
     private volatile LocalDateTime lastOverviewAt = null;
     private static final int OVERVIEW_TTL_SECONDS = 45;
 
-    /**
-     * 总览：只读组装（带短缓存）。阅知类清理改由定时任务 / 巡检执行，避免每次进入页面同步写库。
-     */
     public Map<String, Object> overview() {
         return overview(false);
     }
@@ -94,7 +98,6 @@ public class AiopsService {
         lastScreenBriefAt = null;
     }
 
-    /** 定时清理阅知类，不阻塞页面 GET */
     @org.springframework.scheduling.annotation.Scheduled(fixedRate = 120000, initialDelay = 60000)
     public void scheduledCloseAckCloses() {
         try {
@@ -151,7 +154,6 @@ public class AiopsService {
     return new LinkedHashMap<>(src);
   }
 
-    /** 大屏简报：规则 story + 90s 缓存；含事件/根因/异常供大屏渲染 */
     public Map<String, Object> screenBrief() {
         if (cachedScreenBrief != null && lastScreenBriefAt != null
                 && ChronoUnit.SECONDS.between(lastScreenBriefAt, LocalDateTime.now()) < SCREEN_BRIEF_TTL_SECONDS) {
@@ -183,7 +185,6 @@ public class AiopsService {
         try {
             llmEnabled = Boolean.TRUE.equals(llmSettingsService.resolve().enabled());
         } catch (Exception ignored) {
-            /* ignore */
         }
         m.put("llmEnabled", llmEnabled);
         m.put("health", health);
@@ -217,10 +218,6 @@ public class AiopsService {
     private volatile LocalDateTime lastDashboardAt = null;
     private static final int DASHBOARD_TTL_SECONDS = 15;
 
-    /**
-     * 智能大屏数据看板：全部来自真实库表（设备/告警/性能/AIOps 处置），
-     * 不做任何模拟数据。短缓存 15s，避免大屏 30s 轮询把库打满。
-     */
     @Transactional(readOnly = true)
     public Map<String, Object> dashboard(boolean forceRefresh) {
         if (!forceRefresh && cachedDashboard != null && lastDashboardAt != null
@@ -234,12 +231,10 @@ public class AiopsService {
         Map<String, Object> m = new LinkedHashMap<>();
         List<Device> devices = deviceRepository.findAll();
 
-        // ---------- 设备态势 ----------
         long online = devices.stream().filter(d -> "online".equalsIgnoreCase(d.getStatus())).count();
         long offline = devices.stream().filter(d -> "offline".equalsIgnoreCase(d.getStatus())).count();
         long unknown = devices.size() - online - offline;
 
-        // ---------- 告警态势 ----------
         List<Alarm.Status> openStatuses = List.of(Alarm.Status.ACTIVE, Alarm.Status.ACKNOWLEDGED);
         long activeAlarms = alarmRepository.countByStatusIn(openStatuses);
         long criticalAlarms = alarmRepository.countByStatusAndSeverity(Alarm.Status.ACTIVE, Alarm.Severity.CRITICAL);
@@ -267,7 +262,6 @@ public class AiopsService {
         summary.put("llmOpsMode", policyProperties.getLlmOpsMode());
         m.put("summary", summary);
 
-        // ---------- 告警级别分布（活动告警） ----------
         Map<String, Long> severityCounts = new LinkedHashMap<>();
         for (Object[] row : alarmRepository.countGroupBySeverityInStatus(openStatuses)) {
             if (row[0] != null) severityCounts.put(row[0].toString(), ((Number) row[1]).longValue());
@@ -280,14 +274,12 @@ public class AiopsService {
         severityDist.add(severityItem("INFO", "提示", severityCounts));
         m.put("severityDist", severityDist);
 
-        // ---------- 设备状态分布 ----------
         List<Map<String, Object>> statusDist = new ArrayList<>();
         statusDist.add(Map.of("name", "在线", "value", online));
         statusDist.add(Map.of("name", "离线", "value", offline));
         if (unknown > 0) statusDist.add(Map.of("name", "未知", "value", unknown));
         m.put("statusDist", statusDist);
 
-        // ---------- 24h 告警趋势 ----------
         LocalDateTime trendStart = now.minusHours(23).withMinute(0).withSecond(0).withNano(0);
         Map<String, Long> hourly = new java.util.HashMap<>();
         for (Object[] row : alarmRepository.countGroupByHourSince(trendStart)) {
@@ -309,7 +301,6 @@ public class AiopsService {
         trend.put("values", trendValues);
         m.put("alarmTrend", trend);
 
-        // ---------- 告警类型 TopN（近 7 天） ----------
         List<Map<String, Object>> trapTypes = new ArrayList<>();
         for (Object[] row : alarmRepository.countTrapTypeSince(now.minusDays(7), org.springframework.data.domain.PageRequest.of(0, 6))) {
             if (row[0] == null) continue;
@@ -317,7 +308,6 @@ public class AiopsService {
         }
         m.put("alarmTypes", trapTypes);
 
-        // ---------- 告警最多设备 TopN ----------
         Map<String, String> ipToName = new LinkedHashMap<>();
         for (Device d : devices) {
             ipToName.put(d.getIpAddress(), d.getName());
@@ -334,13 +324,12 @@ public class AiopsService {
         topDevices.sort((a, b) -> Long.compare(((Number) b.get("value")).longValue(), ((Number) a.get("value")).longValue()));
         m.put("topAlarmDevices", topDevices.stream().limit(6).toList());
 
-        // ---------- 资源占用 TopN（真实最新样本） ----------
         Map<Long, String> idToName = new LinkedHashMap<>();
         devices.forEach(d -> idToName.put(d.getId(), d.getName()));
         List<Map<String, Object>> capacity = new ArrayList<>();
         for (PerformanceData p : performanceDataRepository.findLatestSystemMetricsAllDevices()) {
             if (p.getDevice() == null) continue;
-            // 只用代理 id 查名称，避免 getOrDefault 提前求值 Name 触发 N+1 懒加载
+            // 只用代理id查名称，避免getOrDefault提前求值Name触发N+1懒加载
             Long devId = p.getDevice().getId();
             String devName = idToName.get(devId);
             if (devName == null) {
@@ -357,7 +346,6 @@ public class AiopsService {
                 a.get("cpu") == null ? -1 : ((Number) a.get("cpu")).doubleValue()));
         m.put("capacityTop", capacity.stream().limit(6).toList());
 
-        // ---------- 最近告警 ----------
         List<Map<String, Object>> recentAlarms = new ArrayList<>();
         for (Alarm a : alarmRepository.findAllByOrderByOccurredAtDesc(
                 org.springframework.data.domain.PageRequest.of(0, 12))) {
@@ -373,7 +361,6 @@ public class AiopsService {
         }
         m.put("recentAlarms", recentAlarms);
 
-        // ---------- 代表事件 / 根因 ----------
         List<Map<String, Object>> incidents = alarmCorrelationService.listIncidents();
         long pending = incidents.stream().filter(r -> "pending".equals(String.valueOf(r.get("phase")))).count();
         long inProgress = incidents.stream().filter(r -> "in_progress".equals(String.valueOf(r.get("phase")))).count();
@@ -466,7 +453,6 @@ public class AiopsService {
         return playbookService.buildPlaybook(deviceId, alarmId);
     }
 
-    /** 工作台焦点：场景、推荐工具、影响、证据 */
     public Map<String, Object> workbenchFocus(Long alarmId, Long deviceId) {
         return playbookService.buildWorkbenchFocus(alarmId, deviceId);
     }
@@ -480,9 +466,6 @@ public class AiopsService {
         return playbookService.executeStep(action, deviceId, alarmId, confirmed, question);
     }
 
-    /**
-     * 一键智能巡检：立即重算关联 + 基线检测，返回可读报告（让用户「感觉到」智能在干活）。
-     */
     public Map<String, Object> inspectNow() {
         int closedAck = 0;
         try {
@@ -595,7 +578,6 @@ public class AiopsService {
         return report;
     }
 
-    /** 始终返回可读洞察卡片，网络空闲时也说明「智能在做什么」 */
     @SuppressWarnings("unchecked")
     private List<Map<String, Object>> buildInsights(
             Map<String, Object> health,
@@ -624,7 +606,7 @@ public class AiopsService {
                     "/alarms"));
         } else {
             list.add(insight("correlation", "success", "告警关联待命",
-                    "当前无活跃告警。可在 eNSP 关闭一台设备制造离线风暴，再点「一键智能巡检」观察收敛效果",
+                    "当前无活跃告警。断开一台设备制造离线事件后，可点「一键智能巡检」观察收敛效果",
                     "/alarms"));
         }
 
@@ -773,7 +755,6 @@ public class AiopsService {
         return healthScoreService.compute();
     }
 
-    /** 实验室健康报表（JSON，可供前端下载） */
     public Map<String, Object> healthReport() {
         Map<String, Object> health = healthScoreService.compute();
         Map<String, Object> report = new LinkedHashMap<>();
@@ -881,7 +862,6 @@ public class AiopsService {
         return feedbackRepository.findTop50ByOrderByCreatedAtDesc();
     }
 
-    /** 反馈命中率统计：有用/(有用+无用) */
     public Map<String, Object> feedbackStats() {
         Map<String, Object> stats = new LinkedHashMap<>();
         for (String type : List.of("suggestion", "rca", "assistant")) {
@@ -1117,7 +1097,6 @@ public class AiopsService {
         return aiopsActionService.restoreLatestWithConfirm(deviceId, confirmed, reason);
     }
 
-    /** 写入可确认噪音数，避免 UI 用「已标记含已 ACK」误导 */
     private void enrichAckableCounts(Map<String, Object> correlation) {
         List<Alarm> active = alarmRepository.findByStatusInOrderByOccurredAtDesc(List.of(Alarm.Status.ACTIVE));
         long activeSecondary = active.stream().filter(Alarm::isSecondaryAlarm).count();

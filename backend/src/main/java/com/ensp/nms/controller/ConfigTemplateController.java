@@ -8,6 +8,15 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+/**
+ * 配置模板按类型、分类检索与增删改查接口。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15
+ */
+
 @RestController
 @RequestMapping("/api/config-templates")
 @RequiredArgsConstructor

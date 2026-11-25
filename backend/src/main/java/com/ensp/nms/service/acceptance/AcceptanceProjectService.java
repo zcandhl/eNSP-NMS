@@ -15,12 +15,13 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 
 /**
- * 验收工程业务：创建 / 更新 / 级联删除。
+ * 验收项目创建、更新与删除。
  *
- * 工程是验收数据的根：删除工程必须连带删掉它名下的设备（含其告警/拓扑/性能数据）
- * 与方案、批次，否则会留下"孤儿设备/孤儿批次"，
- * 报告导出时按 planId 反查会查到悬空数据，设备列表也会出现悬空归属。
- */
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-11-22 */
+
 @Service
 @RequiredArgsConstructor
 public class AcceptanceProjectService {
@@ -69,10 +70,6 @@ public class AcceptanceProjectService {
         return projectRepository.save(project);
     }
 
-    /**
-     * 级联删除：工程 → 名下设备（含其告警/拓扑/端口/配置/性能数据）→ 方案 → 历史批次。
-     * 设备走 DeviceService.delete 的完整级联，与手动删除单台设备的行为完全一致。
-     */
     @Transactional
     public void delete(Long id) {
         AcceptanceProject project = projectRepository.findById(id)

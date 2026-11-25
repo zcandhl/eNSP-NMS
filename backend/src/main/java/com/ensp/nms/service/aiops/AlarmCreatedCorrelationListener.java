@@ -9,8 +9,13 @@ import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
 /**
- * 新告警提交后尽快重算关联，缩短「告警已出、事件列表未更新」的空窗。
- */
+ * 新告警提交后尽快重算关联，缩短告警已出、列表未更新的空窗。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15 */
+
 @Slf4j
 @Component
 @RequiredArgsConstructor

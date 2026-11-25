@@ -1,6 +1,15 @@
+/**
+ * @file    useSafeNavigate.js
+ * @module  组合式逻辑
+ * @desc    带权限校验的路由跳转封装。
+ *
+ * @author  ZC
+ * @date    2026-08-15 * @version 1.0.0
+ * @requires element-plus
+ */
+
 import { ElMessage, ElMessageBox } from 'element-plus'
 
-/** 明确以「打开/跳转页面」为目的的工具 */
 export const NAVIGATION_TOOLS = new Set([
   'navigate_hint',
   'open_workbench_event',
@@ -22,12 +31,6 @@ export function isSamePage(currentPath, targetPath) {
   return normalizePath(currentPath) === normalizePath(targetPath)
 }
 
-/**
- * 工具结果触发的页面跳转：
- * - 已在目标页：交给 onSamePage（本地聚焦），不重复 push
- * - 跨页：弹确认，避免诊断/误触把用户带走
- * @returns {Promise<boolean>} 是否已处理（含用户取消）
- */
 export async function offerToolNavigate(router, route, { toolName, detail, onSamePage } = {}) {
   if (!detail?.navigate || !detail?.path) return false
 
@@ -44,7 +47,7 @@ export async function offerToolNavigate(router, route, { toolName, detail, onSam
     return true
   }
 
-  // 非导航类工具偶尔带 navigate 标记时，一律确认
+  // 非导航类工具偶尔带navigate标记时，一律确认
   const title = isNavigationTool(toolName) ? '打开页面' : '页面跳转确认'
   try {
     await ElMessageBox.confirm(
@@ -60,6 +63,6 @@ export async function offerToolNavigate(router, route, { toolName, detail, onSam
     await router.push({ path, query })
     return true
   } catch {
-    return true // 已处理（用户取消），调用方勿再 push
+    return true // 已处理，调用方勿再push
   }
 }

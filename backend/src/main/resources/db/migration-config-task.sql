@@ -1,4 +1,4 @@
--- 生产 ddl-auto=validate 时手动执行（开发环境 hibernate update 会自动建表）
+-- 生产ddl-auto=validate时手动执行（开发环境hibernate update会自动建表）
 CREATE TABLE IF NOT EXISTS config_task (
   id VARCHAR(64) NOT NULL PRIMARY KEY,
   type VARCHAR(32) NOT NULL,

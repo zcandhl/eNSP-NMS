@@ -1,3 +1,14 @@
+/**
+ * @file    DeviceDetailDrawer.vue
+ * @module  通用组件
+ * @desc    设备详情抽屉，展示设备信息、端口与配置摘要。
+ *
+ * @author  ZC
+ * @date    2026-08-15
+ * @version 1.0.0
+ * @requires element-plus, vue, vue-router, @/api/device, @/stores/auth, @/utils/deviceCapabilities
+ */
+
 <template>
   <el-drawer
     :model-value="visible"

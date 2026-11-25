@@ -25,6 +25,14 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * 设备台账查询、统计、连通性测试、批量操作与扫描发现接口。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15 */
+
 @Slf4j
 @RestController
 @RequestMapping("/api/devices")
@@ -267,7 +275,7 @@ public class DeviceController {
             try {
                 deviceService.deleteDevice(id);
             } catch (DataIntegrityViolationException e) {
-                // 采集/告警任务是 30s 一轮且用 findAll() 扫全设备：极端情况下会在"清理子表"与
+                // 采集/告警任务是30s一轮且用findAll() 扫全设备：极端情况下会在"清理子表"与
                 // "删除父记录"之间插入一条新的性能告警，触发外键约束。
                 // 此时首次事务已回滚，重新调用会开启新事务、再清一遍子表，即可成功。
                 log.warn("删除设备 {} 首次失败（子表存在并发写入），重试一次: {}", id, e.getMessage());
@@ -298,14 +306,11 @@ public class DeviceController {
         }
     }
 
-    /**
-     * 兼容旧客户端：同步扫描并自动入库新设备。
-     */
     @PostMapping("/discover")
     public ResponseEntity<?> discoverDevices(@RequestBody Map<String, Object> request,
                                              Authentication authentication) {
         try {
-            String network = String.valueOf(request.getOrDefault("network", "192.168.56.0"));
+            String network = String.valueOf(request.getOrDefault("network", "192.168.1.0"));
             int timeout = parseInt(request.get("timeout"), 10);
             String community = String.valueOf(request.getOrDefault("community", "public"));
             int snmpPort = parseInt(request.get("snmpPort"), 161);
@@ -335,12 +340,11 @@ public class DeviceController {
         }
     }
 
-    /** 启动异步扫描（不入库） */
     @PostMapping("/discover/scan")
     public ResponseEntity<?> startDiscoverScan(@RequestBody Map<String, Object> request,
                                                Authentication authentication) {
         try {
-            String network = String.valueOf(request.getOrDefault("network", "192.168.56.0"));
+            String network = String.valueOf(request.getOrDefault("network", "192.168.1.0"));
             int timeout = parseInt(request.get("timeout"), 30);
             String community = String.valueOf(request.getOrDefault("community", "public"));
             int snmpPort = parseInt(request.get("snmpPort"), 161);
@@ -369,9 +373,6 @@ public class DeviceController {
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
-    /**
-     * 从已纳管交换机/路由器 ARP 表发现终端（虚拟 PC）候选，不自动入库。
-     */
     @PostMapping("/discover/endpoints")
     public ResponseEntity<?> discoverEndpoints(Authentication authentication) {
         try {
@@ -395,7 +396,6 @@ public class DeviceController {
         }
     }
 
-    /** 勾选候选设备入库 */
     @PostMapping("/discover/import")
     public ResponseEntity<?> importDiscovered(@RequestBody Map<String, Object> request,
                                               Authentication authentication) {
@@ -424,7 +424,7 @@ public class DeviceController {
                     candidates.add(c);
                 }
             }
-            // 工程上下文：入库设备绑定当前工程（未传/负数 = 未分配）
+            // 工程上下文：入库设备绑定当前工程
             Long projectId = parseLongOrNull(request.get("projectId"));
             List<Device> saved = deviceDiscoveryService.importCandidates(candidates, projectId);
             auditLogService.record(AuditLogService.AuditRecord.builder()

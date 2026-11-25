@@ -7,6 +7,14 @@ import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
 
+/**
+ * 备份计划实体，保存周期策略与目标设备。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15 */
+
 @Data
 @Entity
 @Table(name = "backup_schedule")
@@ -28,18 +36,15 @@ public class BackupSchedule {
     @Column(name = "schedule_time", length = 10)
     private String scheduleTime; // e.g., "02:00"
 
-    /** 每周：ISO 1=周一 … 7=周日；仅 weekly 有效 */
     @Column(name = "day_of_week")
     private Integer dayOfWeek;
 
-    /** 每月：1–31；仅 monthly 有效 */
     @Column(name = "day_of_month")
     private Integer dayOfMonth;
 
     @Column(name = "config_type", length = 20)
     private String configType; // running, startup
 
-    /** 由「设备分组策略」创建时记录来源组，便于成员变更后同步/清理 */
     @Column(name = "source_group_id")
     private Long sourceGroupId;
 

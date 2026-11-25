@@ -1,7 +1,16 @@
+/**
+ * @file    topology.js
+ * @module  接口层/拓扑
+ * @desc    拓扑模块后端接口封装。
+ *
+ * @author  ZC
+ * @date    2026-08-15 * @version 1.0.0
+ */
+
 import request from './index'
 
 export const topologyApi = {
-  // projectId 不传 = 全量拓扑；传了则由后端按工程裁设备与链路
+  // projectId不传 = 全量拓扑；传了则由后端按工程裁设备与链路
   getFullTopology(projectId) {
     const params = projectId != null ? { projectId } : {}
     return request.get('/topology', { params })

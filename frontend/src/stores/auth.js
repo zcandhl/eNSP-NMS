@@ -1,3 +1,13 @@
+/**
+ * @file    auth.js
+ * @module  状态管理/认证
+ * @desc    认证状态：令牌、用户信息、角色与权限持久化。
+ *
+ * @author  ZC
+ * @date    2026-08-15 * @version 1.0.0
+ * @requires pinia, vue, @/api/index
+ */
+
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import request from '@/api/index'
@@ -54,7 +64,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   function hasPermission(code) {
     if (!code) return true
-    // 仅依据 JWT/会话中的权限列表，不再用角色名绕过
+    // 仅依据JWT/会话中的权限列表，不再用角色名绕过
     return permissions.value.includes(code)
   }
 
@@ -80,7 +90,7 @@ export const useAuthStore = defineStore('auth', () => {
       const { useProjectStore } = await import('./project')
       useProjectStore().reset()
     } catch {
-      /* 不阻断登出 */
+      
     }
     if (tokenSnapshot) {
       try {
@@ -96,7 +106,7 @@ export const useAuthStore = defineStore('auth', () => {
   async function fetchMe() {
     if (!token.value) return null
     const data = await request.get('/auth/me')
-    // /me 会返回刷新后的 token（含最新权限），需写入本地
+    // /me会返回刷新后的token，需写入本地
     applyUserPayload(data, true)
     return data
   }

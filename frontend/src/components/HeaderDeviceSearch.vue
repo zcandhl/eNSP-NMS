@@ -1,3 +1,13 @@
+/**
+ * @file    HeaderDeviceSearch.vue
+ * @module  通用组件
+ * @desc    顶栏设备快速搜索组件。
+ *
+ * @author  ZC
+ * @date    2026-08-15 * @version 1.0.0
+ * @requires @element-plus/icons-vue, element-plus, vue, vue-router, @/api/device, @/stores/auth
+ */
+
 <template>
   <div v-if="auth.hasPermission('devices:read')" class="hdr-search" :class="{ focused }">
     <el-icon class="hdr-search-icon"><Search /></el-icon>
@@ -153,7 +163,7 @@ const onSelect = async (item) => {
       customClass: 'hdr-jump-msgbox'
     })
   } catch {
-    /* 取消 */
+    
   }
 }
 </script>

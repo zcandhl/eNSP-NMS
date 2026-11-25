@@ -1,3 +1,13 @@
+/**
+ * @file    AuditCenter.vue
+ * @module  视图页/审计
+ * @desc    操作审计日志查询中心。
+ *
+ * @author  ZC
+ * @date    2026-08-15 * @version 1.0.0
+ * @requires element-plus, vue, vue-router, @/api/audit, @/api/device, @/stores/auth
+ */
+
 <template>
   <div class="nms-page log-center">
     <div class="nms-page-header">
@@ -10,7 +20,7 @@
     <div class="nms-panel log-panel">
       <div class="nms-panel-body log-panel-body">
         <el-tabs v-model="activeTab" class="log-tabs" @tab-change="onTabChange">
-          <!-- ========== 操作日志 ========== -->
+          
           <el-tab-pane
             v-if="auth.hasPermission('audit:read')"
             label="操作日志"
@@ -212,7 +222,7 @@
             </div>
           </el-tab-pane>
 
-          <!-- ========== 配置变更 ========== -->
+          
           <el-tab-pane
             v-if="auth.hasPermission('configs:read')"
             label="配置变更"
@@ -576,7 +586,6 @@ function formatStatus(s) {
   return map[s] || s || '-'
 }
 
-/** 解析历史审计里裸写的 [1,2,3] 告警 ID 列表 */
 function parseAlarmIdList(detail) {
   if (detail == null) return []
   const s = String(detail).trim()

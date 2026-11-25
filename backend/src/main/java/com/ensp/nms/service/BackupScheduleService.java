@@ -18,6 +18,14 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
+/**
+ * 备份计划与分组策略的维护、查询与执行触发。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15 */
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -58,9 +66,6 @@ public class BackupScheduleService {
         return backupScheduleRepository.save(schedule);
     }
 
-    /**
-     * 备份策略：同一周期/类型为多台设备批量创建或更新定时任务（同设备+周期+配置类型去重）。
-     */
     @Transactional
     public Map<String, Object> createPolicy(List<Long> deviceIds, BackupSchedule template) {
         if (deviceIds == null || deviceIds.isEmpty()) {
@@ -125,9 +130,6 @@ public class BackupScheduleService {
         return result;
     }
 
-    /**
-     * 按分组当前成员同步计划：为成员补齐/更新，并清理已离开该组且标记为该组来源的计划。
-     */
     @Transactional
     public Map<String, Object> syncGroupPolicy(Long groupId, BackupSchedule template, boolean removeOrphans) {
         template.setSourceGroupId(groupId);
@@ -149,7 +151,6 @@ public class BackupScheduleService {
         return result;
     }
 
-    /** 同设备 + 周期类型 + 配置类型视为同一策略槽位；scheduleTime 可选匹配 */
     private BackupSchedule findMatching(Long deviceId, String scheduleType, String configType, String scheduleTime) {
         if (deviceId == null) {
             return null;

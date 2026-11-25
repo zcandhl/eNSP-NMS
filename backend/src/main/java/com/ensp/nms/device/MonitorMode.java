@@ -2,6 +2,15 @@ package com.ensp.nms.device;
 
 import java.util.Locale;
 
+/**
+ * 设备监控模式枚举，定义采集与探测方式。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15
+ */
+
 public enum MonitorMode {
     SNMP("snmp"),
     ICMP("icmp"),

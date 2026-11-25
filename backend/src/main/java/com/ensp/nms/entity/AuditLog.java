@@ -15,6 +15,16 @@ import java.time.LocalDateTime;
         @Index(name = "idx_audit_action", columnList = "action"),
         @Index(name = "idx_audit_target_id", columnList = "target_id")
 })
+
+/**
+ * 审计日志实体，记录关键操作人与变更上下文。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15
+ */
+
 public class AuditLog {
 
     @Id

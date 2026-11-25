@@ -13,14 +13,13 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 /**
- * 批次僵尸回收：服务启动时把残留的 RUNNING 批次标记为 INTERRUPTED。
+ * 异常中断验收批次的启动恢复处理。
  *
- * 执行批次靠进程内的守护线程，进程一停线程就没了，状态却留在库里。
- * 不回收的话前端永远显示“运行中”，报告也永远出不来。
- *
- * 保留全部已跑完的项快照；等人工确认的 PENDING 项仍可继续确认，
- * 确认齐了批次会正常收敛为 DONE。
- */
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-11-22 */
+
 @Slf4j
 @Component
 @RequiredArgsConstructor

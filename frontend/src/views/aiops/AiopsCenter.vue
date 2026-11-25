@@ -1,3 +1,13 @@
+/**
+ * @file    AiopsCenter.vue
+ * @module  视图页/智能运维
+ * @desc    智能运维中心聚合页面。
+ *
+ * @author  ZC
+ * @date    2026-08-15 * @version 1.0.0
+ * @requires element-plus, vue, vue-router, @/api/device, @/components/ops-assistant/OpsInlineShell, @/composables/opsAssistantBus, @/composables/pageOpsBus, @/composables/useOpsInlinePanel, @/composables/useOpsTools, @/stores/auth
+ */
+
 <template>
   <div class="aiops-workbench" v-loading="loading">
     <div class="wb-header">
@@ -89,7 +99,7 @@
     </div>
 
     <div class="wb-main">
-      <!-- 左：事件队列 -->
+      
       <section class="wb-col wb-left">
         <div class="wb-col-title">
           <span>事件列表</span>
@@ -177,7 +187,7 @@
         </div>
       </section>
 
-      <!-- 中：作业区 -->
+      
       <section class="wb-col wb-center">
         <div class="wb-col-title sticky-title">当前作业</div>
         <div class="wb-center-scroll">
@@ -393,7 +403,7 @@
         </div>
       </section>
 
-      <!-- 右：智能辅助（默认收起） -->
+      
       <OpsInlineShell storage-key="workbench" fill-parent class="wb-right" />
     </div>
 
@@ -520,9 +530,9 @@ const workLog = ref([])
 const lastDisposeResult = ref(null)
 const policyVisible = ref(false)
 const policySaving = ref(false)
-/** 事件列表：默认只看待处理 */
+
 const incidentFilter = ref('pending')
-/** time_desc | time_asc | severity */
+
 const incidentSort = ref('time_desc')
 const policyForm = ref({
   stormWindowMinutes: 10,
@@ -605,7 +615,6 @@ const secondaryCount = computed(() => {
   return Number.isFinite(n) ? n : 0
 })
 
-/** pending | in_progress | closed */
 function incidentPhase(row) {
   if (!row) return 'pending'
   if (row.phase === 'pending' || row.phase === 'in_progress' || row.phase === 'closed') return row.phase
@@ -636,9 +645,9 @@ const focusInProgress = computed(() =>
     || String(plan.value?.status || '').toUpperCase() === 'ACKNOWLEDGED'
   )
 )
-/** 兼容旧名：仅已关闭 */
+
 const focusHandled = focusClosed
-/** 已关闭后隐藏会重复闭环的动作；处理中仍可标准处置 */
+
 const HIDDEN_WHEN_CLOSED = new Set(['dispose_incident', 'ack_noise', 'ack_alarm'])
 const visibleRecommendedTools = computed(() => {
   const list = Array.isArray(recommendedTools.value) ? recommendedTools.value : []
@@ -694,7 +703,6 @@ function incidentRowClass({ row }) {
   return ''
 }
 
-/** 处置结果回写左侧队列 */
 function patchIncidentStatus(alarmId, status, extra = {}) {
   if (alarmId == null) return
   const list = Array.isArray(overview.value.incidents) ? [...overview.value.incidents] : []
@@ -828,7 +836,7 @@ async function loadLlmExplain(force = false) {
         return
       }
     } catch {
-      /* fallback */
+      
     }
     llmExplain.value = {
       source: 'rules',
@@ -938,7 +946,7 @@ async function loadWorkbenchFocus(row, { autoAsk = false, skipUnattended = false
         } else if (u?.message && !u?.skipped) {
           appendLog(u.message)
         }
-      } catch { /* ignore */ }
+      } catch {  }
     }
   } catch {
     plan.value = {}
@@ -1293,7 +1301,6 @@ function openOpsAssist() {
   requestOpenOpsInline('workbench')
 }
 
-/** 静默刷新：不打断操作区 loading，用于轮询同步新告警到事件列表 */
 async function silentRefresh() {
   if (loading.value || disposing.value || acting.value || inspecting.value) return
   if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return
@@ -1302,7 +1309,7 @@ async function silentRefresh() {
     overview.value = data
     syncPolicyForm(data.policy)
   } catch {
-    /* 静默失败，避免打扰值班 */
+    
   }
 }
 
@@ -1404,7 +1411,7 @@ onMounted(async () => {
   setPageContext({ page: 'workbench' })
   await refresh()
   await applyDeepLink()
-  // 进入页只选中首条，不自动巡检、不自动唤起 LLM（用户点行/「刷新」再拉）
+  // 进入页只选中首条，不自动巡检、不自动唤起LLM
   if (!focus.value && filteredIncidents.value.length) {
     await loadWorkbenchFocus(filteredIncidents.value[0], { autoAsk: false, skipUnattended: true })
   }
@@ -1423,7 +1430,6 @@ watch(
   }
 )
 
-/** 助手工具结果回写本页 */
 watch(
   () => pageSink.token,
   async (token) => {
@@ -1933,7 +1939,7 @@ watch(
   align-self: stretch;
 }
 .wb-right.is-open {
-  /* OpsInlineShell open 态自带边框 */
+  
 }
 
 :deep(.incident-highlight) { background: #ecf5ff !important; }

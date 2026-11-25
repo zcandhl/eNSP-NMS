@@ -10,6 +10,14 @@ import org.springframework.stereotype.Repository;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * 设备 IP 别名数据访问仓库：封装对应实体的持久化查询与写入。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15 */
+
 @Repository
 public interface DeviceIpAliasRepository extends JpaRepository<DeviceIpAlias, Long> {
 
@@ -17,7 +25,6 @@ public interface DeviceIpAliasRepository extends JpaRepository<DeviceIpAlias, Lo
 
     List<DeviceIpAlias> findByDeviceId(Long deviceId);
 
-    /** bulk delete：立即执行 SQL，避免与父表 device 删除的 flush 顺序冲突 */
     @Modifying
     @Query("DELETE FROM DeviceIpAlias a WHERE a.deviceId = :deviceId")
     int deleteAllByDeviceId(@Param("deviceId") Long deviceId);

@@ -1,3 +1,14 @@
+/**
+ * @file    ThemePicker.vue
+ * @module  通用组件
+ * @desc    主题色选择组件。
+ *
+ * @author  ZC
+ * @date    2026-08-15
+ * @version 1.0.0
+ * @requires @element-plus/icons-vue, pinia, @/stores/theme
+ */
+
 <template>
   <el-popover
     :placement="placement"

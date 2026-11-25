@@ -7,11 +7,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * 验收序号发号器：持久化自增，只增不减。
+ * 验收批次单号序列生成。
  *
- * 首次启用时用传入的 initFrom（历史批次里已有的最大序号）打底，
- * 之后与库中现存数据无关——删除批次不会让号段回退。
- */
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-11-22 */
+
 @Service
 @RequiredArgsConstructor
 public class AcceptanceSeqService {

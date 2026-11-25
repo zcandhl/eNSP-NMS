@@ -15,6 +15,14 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * 配置变更日志的登记、查询、状态更新与删除。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15 */
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -72,7 +80,6 @@ public class ConfigChangeLogService {
         return configChangeLogRepository.save(log);
     }
 
-    /** 服务端统一写变更记录，避免依赖前端 POST */
     @Transactional
     public ConfigChangeLog record(Long deviceId, String deviceName, String changeType,
                                   String operator, String reason, String commands,

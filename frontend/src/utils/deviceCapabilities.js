@@ -1,4 +1,12 @@
-/** 与后端 DeviceCapabilityService 对齐的前端兜底能力矩阵 */
+
+/**
+ * @file    deviceCapabilities.js
+ * @module  工具函数
+ * @desc    设备类型能力矩阵前端兜底定义。
+ *
+ * @author  ZC
+ * @date    2026-08-15 * @version 1.0.0
+ */
 
 export const DEVICE_TYPE_OPTIONS = [
   { value: 'router', label: '路由器' },
@@ -17,7 +25,6 @@ export const MONITOR_MODE_OPTIONS = [
   { value: 'icmp', label: '仅 Ping (ICMP)' }
 ]
 
-/** 远程管理协议：AC6005 在 eNSP 中 SSH 不可用，需选 Telnet */
 export const PROTOCOL_OPTIONS = [
   { value: 'ssh', label: 'SSH（stelnet，默认）' },
   { value: 'telnet', label: 'Telnet（AC 类设备）' }
@@ -62,8 +69,8 @@ export function resolveCapabilities(device) {
     }
   }
 
-  // AC6005（eNSP）的 SSH 服务不可用，已改为 telnet 管理；
-  // 只要有远程管理账号，备份与 Web 终端都开放
+  // AC6005（eNSP）的SSH服务不可用，已改为telnet管理
+  // 只要有远程管理账号，备份与Web终端都开放
   const remoteUsable = hasSsh
 
   return {

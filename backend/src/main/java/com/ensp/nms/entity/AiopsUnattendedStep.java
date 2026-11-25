@@ -7,6 +7,16 @@ import java.time.LocalDateTime;
 @Table(name = "aiops_unattended_step", indexes = {
         @Index(name = "idx_unattended_step_run", columnList = "run_id")
 })
+
+/**
+ * 无人值守步骤实体，记录单条工具调用与结果。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15
+ */
+
 public class AiopsUnattendedStep {
 
     @Id

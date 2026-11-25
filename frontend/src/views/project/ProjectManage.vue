@@ -1,3 +1,13 @@
+/**
+ * @file    ProjectManage.vue
+ * @module  视图页/项目
+ * @desc    工程项目管理页面。
+ *
+ * @author  ZC
+ * @date    2026-11-22 * @version 1.0.0
+ * @requires @element-plus/icons-vue, element-plus, pinia, vue, vue-router, @/api/acceptance, @/stores/project
+ */
+
 <template>
   <div class="nms-page pjm-page" v-loading="loading">
     <div class="nms-page-header">
@@ -12,7 +22,7 @@
     </div>
 
     <div class="pjm-body">
-      <!-- 左：工程目录 -->
+      
       <aside class="pjm-list nms-panel">
         <div class="pl-head">
           <span>工程目录</span>
@@ -46,7 +56,7 @@
         </button>
       </aside>
 
-      <!-- 右：工程档案 + 建设流程 -->
+      
       <section v-if="active" class="pjm-detail nms-panel">
         <div class="pd-head">
           <div class="pd-title-block">
@@ -79,7 +89,7 @@
           </div>
         </div>
 
-        <!-- 阶段流水线：建档 → 纳管 → 组网 → 方案 → 执行 → 报告 -->
+        
         <div class="pd-section-title">
           <span>建设到验收</span>
           <em>工程是根，设备、拓扑、验收方案依次挂上去</em>
@@ -161,7 +171,7 @@
       </section>
     </div>
 
-    <!-- 新建 / 编辑工程 -->
+    
     <el-drawer
       v-model="formVisible"
       :title="editingId ? '编辑工程档案' : '新建工程'"
@@ -225,7 +235,6 @@ const activeId = ref(null)
 
 const isCurrent = computed(() => activeId.value != null && activeId.value === projectStore.projectId)
 
-/* ── 阶段定义：真实项目里"一栋楼"从建档到交付的顺序 ── */
 const STEPS = [
   { key: 'archive', label: '工程建档', hint: '完善建筑、参建单位等档案信息，报告封面与工程概况取自这里。' },
   { key: 'devices', label: '设备纳管', hint: '把本工程设备录入系统（支持发现批量入库）；设备归属工程后，拓扑与验收都会自动带出。' },
@@ -250,7 +259,6 @@ const cards = computed(() =>
 
 const active = computed(() => cards.value.find((c) => c.id === activeId.value) || null)
 
-/* 每步的完成判定：只看工程内真实数据，不做"点了就算完成"的假状态 */
 function buildRaw(p) {
   const deviceCount = p.deviceCount || 0
   const linkCount = p.linkCount || 0
@@ -312,7 +320,6 @@ const steps = computed(() => {
   })
 })
 
-/* 引导条：永远指向"第一个还没做完的事"；仅剩报告时提示可出具 */
 const nextStep = computed(() => {
   if (!active.value) return null
   const list = steps.value
@@ -333,7 +340,7 @@ const subtitle = computed(() => {
     `${linkTotal} 条链路`,
     doneTotal ? `${doneTotal} 个已交付` : '暂无已交付工程'
   ]
-  if (mockMode.value) parts.push('演示数据')
+  if (mockMode.value) parts.push('离线数据')
   return parts.join(' · ')
 })
 
@@ -371,7 +378,7 @@ async function reload() {
           s.batchCount = groups.flat().length
           if (batches.length) s.lastRate = rateOf(batches[batches.length - 1])
         } catch (e) {
-          /* 统计失败按 0 处理，不阻塞列表 */
+          
         }
         map.set(p.id, s)
       })
@@ -464,7 +471,6 @@ function setCurrent() {
   ElMessage.success(`已切换到「${active.value.name}」，设备、告警、拓扑、验收已跟随`)
 }
 
-/* 任意一步：先把该工程切成全局上下文，再跳目标页，避免"跳过去看到的还是别的工程" */
 function runStep(step) {
   if (!step || !active.value) return
   if (step.state === 'todo') return
@@ -478,7 +484,7 @@ function go(path) {
 
 function goDevices() {
   const needAdd = (active.value?.deviceCount || 0) === 0
-  // 未纳管时带 intent=entry：设备页先让用户选择录入方式，而非直接弹添加表单
+  // 未纳管时带intent=entry：设备页先让用户选择录入方式，而非直接弹添加表单
   router.push({ path: '/devices', query: needAdd ? { intent: 'entry' } : undefined })
 }
 
@@ -528,7 +534,6 @@ onMounted(async () => {
   gap: 16px;
 }
 
-/* ── 左：工程目录 ── */
 .pjm-list {
   flex: 0 0 296px;
   display: flex;
@@ -712,7 +717,6 @@ onMounted(async () => {
   }
 }
 
-/* ── 右：工程档案 + 流程 ── */
 .pjm-detail {
   flex: 1 1 auto;
   min-width: 0;
@@ -828,7 +832,6 @@ onMounted(async () => {
   }
 }
 
-/* 阶段流水线 */
 .flow {
   display: grid;
   grid-template-columns: repeat(6, 1fr);
@@ -896,7 +899,7 @@ onMounted(async () => {
 }
 
 .fs-line {
-  /* 连线走圆点水平轴：本列圆点右缘 → 下一列圆点左缘（right 为负值跨到下一列），文字在轴线下方不重叠 */
+  
   position: absolute;
   top: 10.5px;
   left: calc(50% + 14px);
@@ -940,7 +943,6 @@ onMounted(async () => {
   white-space: nowrap;
 }
 
-/* 下一步引导 */
 .pd-next {
   display: flex;
   align-items: center;
@@ -981,7 +983,6 @@ onMounted(async () => {
   color: var(--nms-text-secondary);
 }
 
-/* 统计 */
 .pd-kpis {
   display: grid;
   grid-template-columns: repeat(5, 1fr);

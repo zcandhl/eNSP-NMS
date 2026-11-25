@@ -1,3 +1,14 @@
+/**
+ * @file    device.js
+ * @module  状态管理/设备
+ * @desc    设备台账与分组状态缓存。
+ *
+ * @author  ZC
+ * @date    2026-08-15
+ * @version 1.0.0
+ * @requires pinia, vue, @/api/device
+ */
+
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { deviceApi } from '@/api/device'

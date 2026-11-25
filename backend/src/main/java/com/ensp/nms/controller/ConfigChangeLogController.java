@@ -14,6 +14,15 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * 配置变更日志查询、登记、状态更新与删除接口。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15
+ */
+
 @RestController
 @RequestMapping("/api/config-change-logs")
 @RequiredArgsConstructor

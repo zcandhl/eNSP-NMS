@@ -4,22 +4,18 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 判定准则的“人话”层（Word 报告用），与前端 judgeRule.js 同口径。
+ * 验收规则文案与指标描述生成。
  *
- * 把 assertExpr（SpEL）解析成「指标 + 比较 + 目标」并生成中文句子，
- * 例如 ospf.neighborCount >= expectedNeighbors →
- *   当「OSPF 满邻居数」不少于「期望邻居数（方案填 2）」时，判定通过
- *
- * 解析不了（如带除法的表达式）时返回原表达式，报告不丢信息。
- * 注意：指标中文名/单位/参数标签必须与前端 judgeRule.js、AcceptanceCheckTypes 保持一致，
- * 改一处要同步另一处。
- */
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-11-22 */
+
 public final class AcceptanceRuleText {
 
     private AcceptanceRuleText() {
     }
 
-    /** 实测指标中文名与单位（key 与 AcceptanceRunService metrics 一致） */
     private static final Map<String, String[]> METRICS = Map.ofEntries(
             Map.entry("topology.total", new String[]{"实测纳管节点数", "台"}),
             Map.entry("topology.links", new String[]{"拓扑链路数", "条"}),
@@ -39,7 +35,6 @@ public final class AcceptanceRuleText {
     private static final Map<String, String> OPS = Map.of(
             ">=", "不少于", ">", "多于", "==", "等于", "<=", "不超过", "<", "少于", "!=", "不等于");
 
-    /** 运行时指标（裸键）中文名，与前端 judgeRule.js 的 METRIC_KEY_LABEL 同口径 */
     private static final Map<String, String> METRIC_KEY_LABEL = Map.ofEntries(
             Map.entry("masterCount", "主用组数"),
             Map.entry("backupCount", "备用组数"),
@@ -65,10 +60,6 @@ public final class AcceptanceRuleText {
             Map.entry("maxUsage", "最高使用率(%)"),
             Map.entry("noBaseline", "未找到基线"));
 
-    /**
-     * 关键实测值摘要：metrics 逐项转「中文名=值」，与前端 metricsText 同口径。
-     * 过滤内部 detail 字段；键名映射不到时保留原键，报告不丢信息。
-     */
     public static String metricsBrief(Object metricsObj) {
         if (!(metricsObj instanceof Map<?, ?> m) || m.isEmpty()) return "—";
         StringBuilder sb = new StringBuilder();
@@ -97,7 +88,7 @@ public final class AcceptanceRuleText {
         for (int i = 0; i < parts.length; i++) {
             java.util.regex.Matcher m = java.util.regex.Pattern
                     .compile("^([\\w.]+)\\s*(>=|<=|==|!=|>|<)\\s*(.+)$").matcher(parts[i].trim());
-            if (!m.matches()) return expr; // 复杂表达式（如除法）解析不了，原样输出
+            if (!m.matches()) return expr; // 复杂表达式解析不了，原样输出
             String metric = m.group(1), op = m.group(2), right = m.group(3).trim();
             String[] metricDef = METRICS.get(metric);
             if (metricDef == null) return expr;
@@ -114,7 +105,6 @@ public final class AcceptanceRuleText {
         return sentence.append("时，判定通过").toString();
     }
 
-    /** 目标侧：优先方案参数中文名（附当前值），其次是指标，最后是字面量 */
     private static String targetText(String type, Map<String, Object> params, String[] metricDef, String right) {
         String paramKey = stripQuotes(right);
         String paramLabel = paramLabel(type, paramKey);
@@ -135,7 +125,6 @@ public final class AcceptanceRuleText {
         return s.replaceAll("^'|'$", "");
     }
 
-    /** 参数中文名：从 AcceptanceCheckTypes 的 fields 里取 */
     static String paramLabel(String type, String key) {
         for (Map<String, Object> ct : AcceptanceCheckTypes.ALL) {
             if (!type.equals(ct.get("type"))) continue;

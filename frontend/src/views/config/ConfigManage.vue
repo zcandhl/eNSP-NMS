@@ -1,3 +1,13 @@
+/**
+ * @file    ConfigManage.vue
+ * @module  视图页/配置
+ * @desc    设备配置备份、模板与合规管理页。
+ *
+ * @author  ZC
+ * @date    2026-08-15 * @version 1.0.0
+ * @requires @element-plus/icons-vue, element-plus, vue, vue-router, @/api/device, @/components/ops-assistant/OpsInlineShell, @/composables/askOpsAssistant, @/composables/pageOpsBus, @/composables/useOpsInlinePanel, @/composables/webTerminalBus, @/stores/auth, @/utils/blobResponse, @/utils/deviceCapabilities, @/utils/lineDiff
+ */
+
 <template>
   <div class="nms-page config-manage-container">
     <div class="nms-page-header">
@@ -710,7 +720,7 @@
                     style="width: 160px;"
                   />
                   <span class="form-hint" style="margin-left: 10px;">
-                    0 一次全部；&gt;0 时先下发 N 台后暂停，确认后再继续（实验室灰度）
+                    0 一次全部；&gt;0 时先下发 N 台后暂停，确认后再继续（分批下发）
                   </span>
                 </el-form-item>
               </el-form>
@@ -733,7 +743,7 @@
                   </el-table-column>
                   <el-table-column prop="newLineEstimate" label="估算新增" width="90" />
                   <el-table-column prop="alreadyPresentEstimate" label="已存在" width="80" />
-                  <el-table-column label="样例新增行" min-width="180" show-overflow-tooltip>
+                  <el-table-column label="新增行" min-width="180" show-overflow-tooltip>
                     <template #default="{ row }">
                       {{ (row.sampleNewLines || []).join('；') || '-' }}
                     </template>
@@ -1533,7 +1543,7 @@ const compareRightTitle = computed(() => {
 
 const activeTab = ref('backup')
 const devices = ref([])
-/** 可用于 SSH 配置备份/下发的设备（排除虚拟 PC 等） */
+
 const configDevices = computed(() => devices.value.filter(d => canConfigBackup(d)))
 const configs = ref([])
 const compareVersions = ref([])
@@ -1710,7 +1720,6 @@ const batchTemplateId = ref(null)
 const BATCH_STRUCT_TYPES = new Set(['interface', 'vlan', 'static-route', 'ospf'])
 const hasBatchVar = (s) => /\$\{[a-zA-Z0-9_]+\}/.test(String(s || ''))
 
-/** 前缀长度 → 子网掩码 */
 const prefixToSubnetMask = (prefix) => {
   const p = Number(prefix)
   if (!Number.isInteger(p) || p < 0 || p > 32) return null
@@ -1722,7 +1731,6 @@ const prefixToSubnetMask = (prefix) => {
   return parts.join('.')
 }
 
-/** 子网掩码 → 通配符；通配符原样；支持 /24 */
 const toWildcardMask = (input) => {
   let s = String(input || '').trim()
   if (!s || hasBatchVar(s)) return s
@@ -1741,7 +1749,6 @@ const toWildcardMask = (input) => {
   return s
 }
 
-/** 解析「地址 [掩码|/前缀]」或「地址/前缀」 */
 const parseNetworkAndMask = (addrRaw, maskRaw = '') => {
   let addr = String(addrRaw || '').trim()
   let mask = String(maskRaw || '').trim()
@@ -1762,7 +1769,6 @@ const parseNetworkAndMask = (addrRaw, maskRaw = '') => {
   }
 }
 
-/** 华为接口名规范化：GE0/0/1 → GigabitEthernet0/0/1 */
 const normalizeHuaweiIfName = (raw) => {
   let s = String(raw || '').trim().replace(/\s+/g, '')
   if (!s || hasBatchVar(s)) return s
@@ -1781,7 +1787,6 @@ const normalizeHuaweiIfName = (raw) => {
   return s
 }
 
-/** 解析 VLAN ID 列表：10,20,30 或 10-15 */
 const parseVlanIds = (params) => {
   const raw = String(params?.vlanIds ?? '').trim()
   const ids = []
@@ -1807,7 +1812,6 @@ const parseVlanIds = (params) => {
   return [...new Set(ids)].sort((a, b) => a - b)
 }
 
-/** 生成 vlan batch 参数：10 to 12 20 30 */
 const formatVlanBatchArgs = (ids) => {
   if (!ids.length) return ''
   const parts = []
@@ -1825,7 +1829,6 @@ const formatVlanBatchArgs = (ids) => {
   return parts.join(' ')
 }
 
-/** 解析接口列表 */
 const parsePortList = (raw) => {
   const parts = String(raw || '')
     .split(/[\n,;]+/)
@@ -1835,7 +1838,6 @@ const parsePortList = (raw) => {
   return [...new Set(parts)]
 }
 
-/** OSPF 仅单个宣告网段 */
 const parseOspfNetwork = (params) => {
   const primary = parseNetworkAndMask(params.ospfNetwork || params.network, params.ospfMask || params.wildcard)
   if (primary?.network && primary.wildcard) {
@@ -1919,7 +1921,6 @@ const batchCommandsNeedVars = (commands) => {
     || hasBatchVar(cmd)
 }
 
-/** 变量集 CSV 解析：首行变量名，之后每行一组（逗号分隔） */
 const parseVarSetsCsv = (text) => {
   const rows = []
   const errors = []
@@ -2179,7 +2180,6 @@ const selectOnlineDevices = async () => {
 
 const generateConfigCommands = () => buildBatchCommands()
 
-/** 预览与实发共用，避免两边命令不一致 */
 const buildBatchCommands = () => {
   const params = batchForm.value.params
   const type = batchForm.value.configType
@@ -2301,7 +2301,6 @@ const buildBatchCommands = () => {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
-/** 轮询异步配置任务，按服务端真实进度更新 UI */
 const pollConfigTask = async (taskId, onTick) => {
   for (let i = 0; i < 600; i++) {
     const task = await configApi.getConfigTask(taskId)
@@ -2316,7 +2315,7 @@ const pollConfigTask = async (taskId, onTick) => {
 }
 
 const executeBatchConfig = async (deviceIdsOverride = null) => {
-  // 勿用 `override || selected`：按钮 @click 会传入 MouseEvent
+  // 勿用 `override || selected`：按钮 @click会传入MouseEvent
   const targetIds = Array.isArray(deviceIdsOverride) ? deviceIdsOverride : batchSelectedDevices.value
   if (!targetIds?.length) {
     ElMessage.warning('请选择设备')
@@ -2699,7 +2698,6 @@ const loadConfigs = async () => {
   }
 }
 
-/** 对比下拉用全量摘要（不含正文），绑定对比页所选设备 */
 const loadCompareVersions = async () => {
   if (!compareDeviceId.value) {
     compareVersions.value = []
@@ -3787,7 +3785,7 @@ watch(activeTab, (tab) => {
     loadDeviceGroups()
   }
   if (tab === 'compare') {
-    // 若对比页尚未选设备，可顺带带入备份页已选设备（可选，非强制）
+    // 若对比页尚未选设备，可顺带带入备份页已选设备
     if (!compareDeviceId.value && selectedDevice.value) {
       compareDeviceId.value = selectedDevice.value
     }
@@ -3807,7 +3805,7 @@ onMounted(() => {
   loadSchedules()
   loadDeviceGroups()
   loadConfigTasks()
-  // 旧链接 /configs?tab=history 跳转到审计中心
+  // 旧链接 /configs?tab=history跳转到审计中心
   if (route.query.tab === 'history' || route.query.changeLogId) {
     router.replace({
       path: '/audit',
@@ -3836,7 +3834,6 @@ onUnmounted(() => {
   stopTaskPoll()
 })
 
-/** 助手工具结果回写本页 */
 watch(
   () => pageSink.token,
   async (token) => {
@@ -4023,7 +4020,7 @@ watch(
 }
 
 .config-ops-side {
-  /* page-level OpsInlineShell：各 Tab 共用，避免仅备份页可展开 */
+  
 }
 
 .device-panel {

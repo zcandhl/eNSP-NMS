@@ -7,6 +7,14 @@ import lombok.Data;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * 角色变更结果返回对象。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15 */
+
 @Data
 @Builder
 public class RoleMutationResult {
@@ -16,6 +24,5 @@ public class RoleMutationResult {
     private List<String> addedPermissions = new ArrayList<>();
     @Builder.Default
     private List<String> removedPermissions = new ArrayList<>();
-    /** 可读审计 detail */
     private String auditDetail;
 }

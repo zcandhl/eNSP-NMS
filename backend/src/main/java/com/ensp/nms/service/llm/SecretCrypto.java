@@ -13,8 +13,13 @@ import java.security.SecureRandom;
 import java.util.Base64;
 
 /**
- * 使用 JWT secret 派生 AES-GCM 密钥，加密存储 LLM API Key。
- */
+ * 使用JWT secret派生AES-GCM密钥，加密存储LLM API Key。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15 */
+
 @Component
 public class SecretCrypto {
 

@@ -16,6 +16,14 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * 越限指标判定、性能告警生成与确认办结。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15 */
+
 @Slf4j
 @Service
 public class PerformanceAlertService {
@@ -35,7 +43,6 @@ public class PerformanceAlertService {
     @Autowired
     private PerformanceThresholdProperties thresholdProperties;
 
-    /** 相对采集任务错开 15s，避免与 PerformanceMonitorService 同时扫全设备 */
     @Scheduled(fixedRate = 30000, initialDelay = 15000)
     public void checkAndGenerateAlerts() {
         log.info("开始检查性能告警...");
@@ -44,7 +51,7 @@ public class PerformanceAlertService {
             return;
         }
 
-        // 预取活跃告警，避免每设备×每指标 N+1
+        // 预取活跃告警，避免每设备×每指标N+1
         List<PerformanceAlert> openAlerts = alertRepository.findByStatusInOrderByCreatedAtDesc(
                 List.of("active", "acknowledged"));
         Map<String, PerformanceAlert> alertIndex = new HashMap<>();

@@ -12,6 +12,14 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * 性能指标数据访问仓库：封装对应实体的持久化查询与写入。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15 */
+
 @Repository
 public interface PerformanceDataRepository extends JpaRepository<PerformanceData, Long> {
 
@@ -22,7 +30,6 @@ public interface PerformanceDataRepository extends JpaRepository<PerformanceData
     @Query("DELETE FROM PerformanceData p WHERE p.device.id = :deviceId")
     void deleteByDeviceId(@Param("deviceId") Long deviceId);
 
-    /** 删除早于指定时间的性能数据（保留策略） */
     @Modifying(clearAutomatically = true)
     @Query("DELETE FROM PerformanceData p WHERE p.timestamp < :before")
     int deleteByTimestampBefore(@Param("before") LocalDateTime before);
@@ -72,7 +79,6 @@ public interface PerformanceDataRepository extends JpaRepository<PerformanceData
            "WHERE p.device_id = :deviceId", nativeQuery = true)
     List<PerformanceData> findLatestPortMetricsByDeviceId(@Param("deviceId") Long deviceId);
 
-    /** 全网每台设备最新一条系统级指标（CPU/内存），供大屏 TopN 使用 */
     @Query(value = "SELECT p.* FROM performance_data p " +
            "INNER JOIN (" +
            "  SELECT device_id, MAX(timestamp) AS max_ts FROM performance_data " +

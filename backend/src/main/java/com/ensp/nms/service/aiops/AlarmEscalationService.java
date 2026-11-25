@@ -15,8 +15,13 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 实验室级超时升级：待处理告警超过阈值后提升一级严重度，可选 Webhook。
- */
+ * 超时升级：待处理告警超过阈值后提升一级严重度，可选Webhook。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15 */
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -107,7 +112,6 @@ public class AlarmEscalationService {
         }
     }
 
-    /** INFO → WARNING → MINOR → MAJOR → CRITICAL（CLEARED 保持不变） */
     private static Alarm.Severity bump(Alarm.Severity s) {
         if (s == null) {
             return Alarm.Severity.WARNING;

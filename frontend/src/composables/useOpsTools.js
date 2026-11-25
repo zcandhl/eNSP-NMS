@@ -1,9 +1,16 @@
+/**
+ * @file    useOpsTools.js
+ * @module  组合式逻辑
+ * @desc    运维助手可用工具列表与执行封装。
+ *
+ * @author  ZC
+ * @date    2026-08-15 * @version 1.0.0
+ * @requires element-plus, @/api/device
+ */
+
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { llmApi } from '@/api/device'
 
-/**
- * 页内半闭环工具执行（确认后调用 /api/llm/execute-tool）。
- */
 export function useOpsTools() {
   async function executeTool(tool, { skipConfirm = false } = {}) {
     const name = tool?.name || tool?.id

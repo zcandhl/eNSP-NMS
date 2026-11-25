@@ -31,8 +31,13 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * 可长期运营的无人值守：LLM 规划 → 白名单执行 → 落库；失败/暂停/熔断回退规则。
- */
+ * 无人值守流程：LLM规划→白名单执行→落库；失败/暂停/熔断回退规则。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15 */
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -130,7 +135,7 @@ public class LlmUnattendedOpsService {
                     .status("success")
                     .summary(String.valueOf(m.get("message")))
                     .build());
-        } catch (Exception ignored) { /* ignore */ }
+} catch (Exception ignored) { /* ignore */ }
         return m;
     }
 
@@ -255,7 +260,7 @@ public class LlmUnattendedOpsService {
                     .summary(String.valueOf(result.get("message")))
                     .detail("trigger=" + trigger + ", processed=" + processed)
                     .build());
-        } catch (Exception ignored) { /* ignore */ }
+} catch (Exception ignored) { /* ignore */ }
         return result;
     }
 
@@ -443,7 +448,6 @@ public class LlmUnattendedOpsService {
         return out;
     }
 
-    /** 兼容旧调用 */
     public Map<String, Object> runForAlarm(Long alarmId, Long deviceId, int maxSteps) {
         return runForAlarm(alarmId, deviceId, maxSteps, "api");
     }
@@ -452,7 +456,7 @@ public class LlmUnattendedOpsService {
     public int purgeOldRuns() {
         int days = Math.max(1, policyProperties.getUnattendedRunRetentionDays());
         LocalDateTime cutoff = LocalDateTime.now().minusDays(days);
-        // 简化：直接按时间删 run；step 可通过孤儿清理或级联（此处先删 step 再删 run）
+        // 简化：直接按时间删run；step可通过孤儿清理或级联
         List<AiopsUnattendedRun> old = runRepository.findAll().stream()
                 .filter(r -> r.getStartedAt() != null && r.getStartedAt().isBefore(cutoff))
                 .limit(500)

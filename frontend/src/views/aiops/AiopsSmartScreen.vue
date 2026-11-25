@@ -1,6 +1,16 @@
+/**
+ * @file    AiopsSmartScreen.vue
+ * @module  视图页/智能运维
+ * @desc    智能运维大屏展示页。
+ *
+ * @author  ZC
+ * @date    2026-08-15 * @version 1.0.0
+ * @requires echarts, vue, @/api/device, @/composables/askOpsAssistant
+ */
+
 <template>
   <div class="smart-screen" v-loading="loading">
-    <!-- 顶部标题栏 -->
+    
     <header class="ss-header">
       <div class="ss-brand">
         <div class="ss-logo">AIOps</div>
@@ -28,7 +38,7 @@
       </div>
     </header>
 
-    <!-- 态势简报 -->
+    
     <div class="ss-brief">
       <span class="ss-brief-tag">态势</span>
       <span class="ss-brief-text">{{ brief || '正在汇总设备、告警与处置数据…' }}</span>
@@ -44,7 +54,7 @@
       class="ss-alert"
     />
 
-    <!-- KPI 指标卡 -->
+    
     <section class="ss-kpis">
       <div class="kpi" v-for="k in kpis" :key="k.label" :class="k.tone">
         <div class="kpi-main">
@@ -56,7 +66,7 @@
       </div>
     </section>
 
-    <!-- 主体图表区 -->
+    
     <section class="ss-grid">
       <div class="panel span6">
         <div class="panel-head">
@@ -162,7 +172,7 @@
       </div>
     </section>
 
-    <!-- 处置流水 -->
+    
     <footer class="ss-footer">
       <div class="panel-head">
         <h3>最近自动 / 人工处置</h3>
@@ -661,7 +671,6 @@ onUnmounted(() => {
   font-variant-numeric: tabular-nums;
 }
 
-/* 顶部 */
 .ss-header {
   display: flex;
   justify-content: space-between;
@@ -731,7 +740,6 @@ onUnmounted(() => {
 .ss-score.bad .ss-score-n { color: #f89898; }
 .ss-score-l { font-size: 10px; color: #8fa3bf; }
 
-/* 简报 */
 .ss-brief {
   display: flex;
   align-items: flex-start;
@@ -757,7 +765,6 @@ onUnmounted(() => {
 .ss-brief-text { flex: 1; min-width: 0; }
 .ss-alert { margin-bottom: 12px; }
 
-/* KPI */
 .ss-kpis {
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
@@ -802,7 +809,6 @@ onUnmounted(() => {
 .kpi-label { margin-top: 3px; font-size: 12px; color: #c5d4e8; }
 .kpi-foot { margin-top: 4px; font-size: 11px; color: #6b7f99; }
 
-/* 网格 */
 .ss-grid {
   display: grid;
   grid-template-columns: repeat(12, minmax(0, 1fr));
@@ -842,7 +848,6 @@ onUnmounted(() => {
 .chart { height: 208px; width: 100%; }
 .chart-lg { height: 226px; }
 
-/* 列表 */
 .ss-list {
   flex: 1;
   max-height: 226px;
@@ -932,7 +937,6 @@ onUnmounted(() => {
 .rca-score.mid { background: rgba(230, 162, 60, 0.18); color: #e6a23c; }
 .rca-score.low { background: rgba(120, 160, 210, 0.14); color: #9fb3cd; }
 
-/* 处置流水 */
 .ss-footer {
   margin-top: 10px;
   padding: 10px 12px;

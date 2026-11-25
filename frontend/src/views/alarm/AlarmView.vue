@@ -1,3 +1,13 @@
+/**
+ * @file    AlarmView.vue
+ * @module  视图页/告警
+ * @desc    告警列表与处理页面。
+ *
+ * @author  ZC
+ * @date    2026-08-15 * @version 1.0.0
+ * @requires echarts, element-plus, pinia, vue, vue-router, @/api/device, @/components/XtermTerminal, @/components/ops-assistant/OpsInlineShell, @/composables/askOpsAssistant, @/composables/pageOpsBus, @/composables/useOpsInlinePanel, @/composables/useThemeColors, @/composables/useVisibilityPoller, @/composables/webTerminalBus, @/stores/auth, @/stores/project, @/stores/theme
+ */
+
 <template>
   <div class="nms-page alarm-page">
     <div class="nms-page-header">
@@ -430,7 +440,7 @@
       </div>
     </div>
 
-    <!-- 确认对话框 -->
+    
     <el-dialog
       v-model="ackDialogVisible"
       :title="ackDialogTitle"
@@ -460,7 +470,7 @@
       </template>
     </el-dialog>
 
-    <!-- 详情 -->
+    
     <el-dialog
       v-model="showDetailPanel"
       title="告警运维详情"
@@ -662,7 +672,7 @@
       </template>
     </el-dialog>
 
-    <!-- 告警页内 WebSSH，不跳转拓扑 -->
+    
     <el-dialog
       v-model="terminalDialogVisible"
       width="92vw"
@@ -731,7 +741,7 @@
       </template>
     </el-dialog>
 
-    <!-- 告警页内设备监视，不跳转拓扑 -->
+    
     <el-dialog
       v-model="monitorDialogVisible"
       :title="monitorTitle"
@@ -832,11 +842,11 @@ const alarms = ref([])
 const alarmStats = ref({})
 const loading = ref(false)
 const searchKeyword = ref('')
-/** 从拓扑等入口带入的设备过滤 */
+
 const deviceIdFilter = ref(null)
 const statusFilter = ref(['ACTIVE', 'ACKNOWLEDGED'])
 const timeRange = ref('24h')
-/** 已生效的自定义区间 [from, to] */
+
 const customTimeRange = ref(null)
 const customTimePanelVisible = ref(false)
 const customTimeDraftStart = ref(null)
@@ -853,7 +863,6 @@ const customTimeLabel = computed(() => {
   return `${fmt(a)} ~ ${fmt(b)}`
 })
 
-/** 预设 Radio：自定义生效时不高亮任一预设，避免非法 model 值 */
 const timePreset = computed({
   get() {
     if (hasCustomTimeRange.value || timeRange.value === 'custom') return undefined
@@ -887,10 +896,9 @@ const pageSize = ref(20)
 const total = ref(0)
 const sortProp = ref('occurredAt')
 const sortOrder = ref('desc')
-/** 内部场景：duty | critical | overdue | history（后两者由指标下钻设置） */
+
 const dutyView = ref('duty')
 
-/** 顶部只暴露「值班中 / 全部历史」；指标下钻时仍显示为值班中 */
 const sceneView = computed({
   get() {
     return dutyView.value === 'history' ? 'history' : 'duty'
@@ -905,7 +913,7 @@ const overdueOnly = ref(false)
 
 const ackDialogVisible = ref(false)
 const ackForm = ref({ note: '', ids: [], mode: 'single' })
-/** 打开确认框时记录是否阅知关闭（批量时：全部命中才视为阅知关闭） */
+
 const ackDialogAckClose = ref(false)
 const ackDialogTitle = computed(() => (ackDialogAckClose.value ? '阅知关闭' : '确认告警'))
 const ackDialogIsAckClose = computed(() => ackDialogAckClose.value)
@@ -964,7 +972,6 @@ const secondaryActiveCount = computed(() =>
 const hasUnclearedAlarms = computed(() => selectedAlarms.value.some(a => a.status !== 'CLEARED'))
 const unclearedAlarmCount = computed(() => selectedAlarms.value.filter(a => a.status !== 'CLEARED').length)
 
-/** Element Plus Steps 的 active 从 0 起：0=发生 1=处理中 2=已关闭；≥3 表示全部完成 */
 const lifecycleStep = computed(() => {
   const a = currentAlarm.value
   if (!a) return 0
@@ -973,7 +980,6 @@ const lifecycleStep = computed(() => {
   return 0
 })
 
-/** 本页风暴收敛 */
 const displayRows = computed(() => {
   const list = alarms.value || []
   if (!stormCollapse.value) {
@@ -1121,7 +1127,6 @@ const activeMetric = computed(() => {
   return ''
 })
 
-/** 严重/超时下钻时锁定状态筛选，避免与指标语义冲突 */
 const isMetricDrillLocked = computed(() => {
   return dutyView.value === 'critical' || dutyView.value === 'overdue' || overdueOnly.value
 })
@@ -1226,7 +1231,6 @@ const onSeverityCardClick = (filter) => {
   filterBySeverity(filter)
 }
 
-/** 级别块显示的是全历史、全状态计数，下钻时需切「全部」时间并放开状态勾选，否则看不到历史告警 */
 const enterSeverityDrillRange = () => {
   if (!severityDrillPrevRange) severityDrillPrevRange = timeRange.value
   if (!severityDrillPrevStatus) severityDrillPrevStatus = [...statusFilter.value]
@@ -1251,7 +1255,6 @@ const onFilterChange = () => {
   loadAlarms(false)
 }
 
-/** 状态勾选：用 @change 入参，避免 v-model 时序导致读到旧值 */
 const onStatusFilterChange = (val) => {
   if (skipStatusWatch) return
   const next = Array.isArray(val) ? [...val] : [...(statusFilter.value || [])]
@@ -1293,7 +1296,7 @@ const confirmCustomTimeRange = () => {
     return
   }
   customTimeRange.value = [start, end]
-  // 保留上一预设高亮无关；查询以自定义区间为准。置空避免 radio 无匹配值异常
+  // 保留上一预设高亮无关；查询以自定义区间为准。置空避免radio无匹配值异常
   timeRange.value = 'custom'
   customTimePanelVisible.value = false
   onFilterChange()
@@ -1413,7 +1416,7 @@ const handleSortChange = ({ prop, order }) => {
 
 const tableRowClassName = ({ row }) => {
   let sev = String(row.severity || '').toLowerCase()
-  // WARNING 与 MAJOR 统一按「重要」底色
+  // WARNING与MAJOR统一按「重要」底色
   if (sev === 'warning') sev = 'major'
   const classes = [`sev-${sev}`]
   if (row.status === 'CLEARED') {
@@ -1439,7 +1442,7 @@ const focusAlarmRow = (alarm, { autoAsk = false } = {}) => {
     try {
       const hit = displayRows.value.find((r) => Number(r.id) === Number(cur.id))
       alarmTableRef.value?.setCurrentRow?.(hit || cur)
-    } catch { /* ignore */ }
+    } catch {  }
   })
   setPageContext({
     page: 'alarms',
@@ -1512,7 +1515,6 @@ const parseDescField = (text, label) => {
   return m ? m[1].trim() : ''
 }
 
-/** 从【摘要】提取一句话说明；其余作为详情正文（去掉重复计数尾巴） */
 const alarmSummaryText = computed(() => {
   const d = currentAlarm.value?.description
   if (!d) return ''
@@ -1588,7 +1590,7 @@ const openTerminalDialog = () => {
 }
 
 const onTerminalOpened = () => {
-  // 布局稳定后再触发一次窗口 resize，便于 xterm fit
+  // 布局稳定后再触发一次窗口resize，便于xterm fit
   nextTick(() => window.dispatchEvent(new Event('resize')))
 }
 
@@ -1968,7 +1970,6 @@ const getSeverityText = (severity) => {
   }
 }
 
-/** WARNING 与 MAJOR 共用样式键 */
 const severityCssKey = (severity) => {
   const s = String(severity || '').toLowerCase()
   return s === 'warning' ? 'major' : s
@@ -1998,7 +1999,6 @@ const ackHint = (row) => {
   return `确认人：${by}${note}`
 }
 
-/** 从 rawData 解析 snmpTrapOID，纠偏历史「通用Trap告警」展示 */
 const refineTrapTypeFromRaw = (rawData) => {
   if (!rawData) return null
   const m = String(rawData).match(/1\.3\.6\.1\.6\.3\.1\.1\.4\.1\.0\s*=\s*([0-9.]+)/i)
@@ -2084,7 +2084,7 @@ const formatDateTime = (dateStr) => {
   })
 }
 
-// 状态筛选由 checkbox-group @change → onStatusFilterChange 触发，不再 watch 以免重复请求
+// 状态筛选由checkbox-group @change → onStatusFilterChange触发，不再watch以免重复请求
 
 watch(searchKeyword, () => {
   if (searchTimer) clearTimeout(searchTimer)
@@ -2151,7 +2151,6 @@ const clearDeviceIdFilter = () => {
   loadAlarms(false)
 }
 
-/** 助手工具结果回写本页 */
 watch(
   () => pageSink.token,
   async (token) => {
@@ -2226,7 +2225,7 @@ onUnmounted(() => {
   flex-direction: column;
 }
 .alarm-work-side {
-  /* OpsInlineShell 自身控制宽高 */
+  
 }
 @media (max-width: 1100px) {
   .alarm-work-split {
@@ -2438,12 +2437,12 @@ onUnmounted(() => {
 .custom-time-btn {
   flex-shrink: 0;
   max-width: 220px;
-  --el-button-bg-color: #fff;
-  --el-button-border-color: #dcdfe6;
-  --el-button-text-color: #606266;
-  --el-button-hover-bg-color: #ecf5ff;
-  --el-button-hover-border-color: #c6e2ff;
-  --el-button-hover-text-color: var(--el-color-primary);
+--el-button-bg-color: #fff;
+--el-button-border-color: #dcdfe6;
+--el-button-text-color: #606266;
+--el-button-hover-bg-color: #ecf5ff;
+--el-button-hover-border-color: #c6e2ff;
+--el-button-hover-text-color: var(--el-color-primary);
 }
 
 .custom-time-btn :deep(span) {
@@ -2471,12 +2470,12 @@ onUnmounted(() => {
 }
 
 .custom-time-btn.is-active-range {
-  --el-button-bg-color: #ecf5ff;
-  --el-button-border-color: var(--el-color-primary);
-  --el-button-text-color: var(--el-color-primary);
-  --el-button-hover-bg-color: #ecf5ff;
-  --el-button-hover-border-color: var(--el-color-primary);
-  --el-button-hover-text-color: var(--el-color-primary);
+--el-button-bg-color: #ecf5ff;
+--el-button-border-color: var(--el-color-primary);
+--el-button-text-color: var(--el-color-primary);
+--el-button-hover-bg-color: #ecf5ff;
+--el-button-hover-border-color: var(--el-color-primary);
+--el-button-hover-text-color: var(--el-color-primary);
 }
 
 .custom-time-row {
@@ -2515,7 +2514,6 @@ onUnmounted(() => {
   flex-shrink: 0;
 }
 
-/* 按告警级别铺背景色（无左侧色条） */
 :deep(.el-table__body tr.sev-critical > td) {
   background-color: #fef0f0 !important;
 }
@@ -2792,7 +2790,7 @@ onUnmounted(() => {
 </style>
 
 <style>
-/* append-to-body 后需非 scoped 才能命中弹层 */
+
 .alarm-terminal-dialog {
   max-width: 1280px !important;
 }

@@ -8,11 +8,13 @@ import org.hibernate.annotations.UpdateTimestamp;
 import java.time.LocalDateTime;
 
 /**
- * 验收方案：验收什么、判定准则是什么，全部以数据形式存这里。
- * 换一个项目改一份方案即可，验收引擎（代码）不变。
- * checks 结构：[{id, seq, code, title, type, owner, severity, enabled,
- *               allowFinding, needConfirm, params:{...}, assertExpr}]
- */
+ * 验收计划实体，关联项目与检查项配置。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-11-22 */
+
 @Data
 @Entity
 @Table(name = "acceptance_plan")
@@ -31,15 +33,12 @@ public class AcceptancePlan {
     @Column(length = 30)
     private String version = "1.0";
 
-    /** 报告编号规则，如 YS-{date}-{batch} */
     @Column(name = "report_no_rule", length = 60)
     private String reportNoRule = "YS-{date}-{batch}";
 
-    /** draft | active | archived */
     @Column(length = 20)
     private String status = "draft";
 
-    /** 检查项列表（JSON 数组文本） */
     @Column(name = "checks_json", columnDefinition = "TEXT")
     private String checksJson;
 

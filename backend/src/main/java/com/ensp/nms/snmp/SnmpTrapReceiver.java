@@ -49,9 +49,13 @@ import java.util.Locale;
 import java.util.Map;
 
 /**
- * 统一接收 SNMPv1 Trap / SNMPv2c Trap&amp;Inform / SNMPv3 Trap&amp;Inform，
- * 解析后写入告警。v3 需在 snmp.trap.v3.users 配置与设备一致的 USM 用户。
- */
+ * 统一接收SNMPv1/v2c/v3 Trap与Inform，解析后写入告警；v3需配置与设备一致的USM用户。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15 */
+
 @Slf4j
 @Service
 public class SnmpTrapReceiver implements CommandLineRunner {
@@ -87,7 +91,7 @@ public class SnmpTrapReceiver implements CommandLineRunner {
             Address listenAddress = GenericAddress.parse("udp:0.0.0.0/" + trapPort);
             transport = new DefaultUdpTransportMapping((UdpAddress) listenAddress);
 
-            // 显式 MessageDispatcher，保证 v1/v2c/v3 三模型都注册
+            // 显式MessageDispatcher，保证v1/v2c/v3三模型都注册
             MessageDispatcherImpl dispatcher = new MessageDispatcherImpl();
             dispatcher.addMessageProcessingModel(new MPv1());
             dispatcher.addMessageProcessingModel(new MPv2c());
@@ -229,7 +233,7 @@ public class SnmpTrapReceiver implements CommandLineRunner {
                     event.getSecurityName() != null
                             ? new String(event.getSecurityName(), StandardCharsets.UTF_8) : "-");
 
-            // Inform 必须应答，否则设备会重传
+            // Inform必须应答，否则设备会重传
             if (pdu.getType() == PDU.INFORM) {
                 acknowledgeInform(event, pdu);
             }
@@ -264,7 +268,7 @@ public class SnmpTrapReceiver implements CommandLineRunner {
                 parseTrapVariable(oid, value, trapData);
             }
 
-            // SNMPv1：agent-addr + genericTrap（eNSP 大量发 v1，无 snmpTrapOID VB）
+            // SNMPv1：agent-addr + genericTrap
             try {
                 if (pdu instanceof PDUv1 v1) {
                     trapData.put("snmpVersion", "v1");
@@ -282,8 +286,8 @@ public class SnmpTrapReceiver implements CommandLineRunner {
                     if (v1.getEnterprise() != null) {
                         trapData.put("enterpriseOid", v1.getEnterprise().toString());
                     }
-                    // 仅当 VB 中没有 snmpTrapOID 时，用 v1 genericTrap 补齐标准 Trap
-                    // generic=6(enterpriseSpecific) 不强行拼 OID，避免误分类/抑制合并导致“告警消失”
+                    // 仅当VB中没有snmpTrapOID时，用v1 genericTrap补齐标准Trap
+                    // generic=6(enterpriseSpecific) 不强行拼OID，避免误分类/抑制合并导致“告警消失”
                     if (!trapData.containsKey("trapOid") && generic >= 0 && generic <= 5) {
                         String mappedOid = mapV1GenericTrapToOid(generic, specific, null);
                         if (mappedOid != null) {
@@ -296,7 +300,7 @@ public class SnmpTrapReceiver implements CommandLineRunner {
                 log.warn("解析 SNMPv1 PDU 扩展字段失败: {}", e.getMessage());
             }
 
-            // 逻辑设备 IP：优先真实 agent，过滤 0.0.0.0；再回退任意非空，最后用 peer
+            // 逻辑设备IP：优先真实agent，过滤0.0.0.0；再回退任意非空，最后用peer
             String agentIp = firstUsableIp(
                     trapData.get("snmpTrapAddress"),
                     trapData.get("agentAddress"),
@@ -334,7 +338,7 @@ public class SnmpTrapReceiver implements CommandLineRunner {
                         trapData.get("sysName"), trapData.get("trapOid"),
                         trapData.get("ifName"), trapData.get("ifIndex"));
 
-                // 恢复类 Trap：关闭对应故障告警（含处理中），瞬时恢复通知写库后自动办结
+                // 恢复类Trap：关闭对应故障告警，瞬时恢复通知写库后自动办结
                 if (saved != null && alarmService.isTransientRecoveryNotice(info.type, info.title)) {
                     try {
                         int cleared;
@@ -350,7 +354,7 @@ public class SnmpTrapReceiver implements CommandLineRunner {
                                     saved.getDeviceIp(),
                                     info.type,
                                     "收到恢复 Trap「" + info.type + "」，自动关闭对应故障告警");
-                            // 负载恢复时顺带清网管 PERFORMANCE 双轨
+                            // 负载恢复时顺带清网管PERFORMANCE双轨
                             if (info.type != null && info.type.contains("负载恢复")) {
                                 if (saved.getDeviceId() != null) {
                                     alarmService.clearPerformanceThresholdAlarm(saved.getDeviceId(), "cpu");
@@ -398,7 +402,6 @@ public class SnmpTrapReceiver implements CommandLineRunner {
         return null;
     }
 
-    /** 识别 Trap 报文版本：v1 / v2c / v3 */
     private String resolveSnmpVersion(CommandResponderEvent event, PDU pdu) {
         if (pdu instanceof PDUv1) {
             return "v1";
@@ -441,7 +444,6 @@ public class SnmpTrapReceiver implements CommandLineRunner {
         };
     }
 
-    /** SNMPv2c/v3 Inform 必须回 RESPONSE，否则设备反复重传 */
     private void acknowledgeInform(CommandResponderEvent event, PDU request) {
         try {
             PDU response = new PDU(request);
@@ -465,7 +467,6 @@ public class SnmpTrapReceiver implements CommandLineRunner {
         }
     }
 
-    /** ifOperStatus: 1=up, 2=down（兼容 INTEGER: 前缀与英文） */
     private boolean isOperDown(String raw) {
         if (raw == null || raw.isBlank()) {
             return false;
@@ -657,7 +658,7 @@ public class SnmpTrapReceiver implements CommandLineRunner {
     private void parseTrapVariable(String oid, String value, Map<String, String> trapData) {
         if (oid == null) return;
 
-        // SNMPv2 snmpTrapAddress — 设备真实 IP，常不同于 UDP 报文源（Cloud/NAT）
+        // SNMPv2 snmpTrapAddress — 设备真实IP，常不同于UDP报文源（Cloud/NAT）
         if (oid.contains("1.3.6.1.6.3.18.1.3")) {
             String ip = AlarmService.normalizeDeviceIp(value);
             if (ip == null || ip.isBlank()) {
@@ -671,7 +672,7 @@ public class SnmpTrapReceiver implements CommandLineRunner {
             }
         }
 
-        // snmpTrapOID（规范化 value，去掉 OID: 前缀等）
+        // snmpTrapOID
         if (oid.contains("1.3.6.1.6.3.1.1.4.1.0")) {
             trapData.put("trapOid", normalizeOid(value));
         }
@@ -679,7 +680,7 @@ public class SnmpTrapReceiver implements CommandLineRunner {
         if (oid.contains("1.3.6.1.2.1.1.5.0") || oid.endsWith(".1.3.6.1.2.1.1.5.0")) {
             trapData.put("sysName", value);
         }
-        // 部分 Trap 用 sysName 短 OID 片段
+        // 部分Trap用sysName短OID片段
         if (oid.matches(".*\\.1\\.3\\.6\\.1\\.2\\.1\\.1\\.5\\.0$") || oid.contains(".1.2.1.1.5.0")) {
             trapData.put("sysName", value);
         }
@@ -696,7 +697,7 @@ public class SnmpTrapReceiver implements CommandLineRunner {
             trapData.put("sysLocation", value);
         }
         
-        // 精确匹配 ifEntry 列，避免 1.2.1.2.2.1.1 误匹配 1.2.1.2.2.1.10(ifInOctets) 等
+        // 精确匹配ifEntry列，避免1.2.1.2.2.1.1误匹配1.2.1.2.2.1.10(ifInOctets) 等
         if (oid.matches(".*\\.1\\.3\\.6\\.1\\.2\\.1\\.2\\.2\\.1\\.1(\\..+)?$")
                 || oid.matches("^1\\.3\\.6\\.1\\.2\\.1\\.2\\.2\\.1\\.1(\\..+)?$")) {
             putIfIndex(trapData, value, oid);
@@ -796,14 +797,14 @@ public class SnmpTrapReceiver implements CommandLineRunner {
             trapData.put("lldpRemFrames", value);
         }
         
-        // OSPF Router-ID（带/不带 .0）
+        // OSPF Router-ID
         if (oid.matches(".*\\.1\\.3\\.6\\.1\\.2\\.1\\.14\\.1\\.1(\\.0)?$")
                 || oid.matches("^1\\.3\\.6\\.1\\.2\\.1\\.14\\.1\\.1(\\.0)?$")
                 || oid.contains("1.3.6.1.2.1.14.1.1.0")) {
             trapData.put("ospfRouterId", value);
         }
 
-        // OSPF 邻居表列（实例后缀可变；用列号精确匹配，避免 14.7.1.12 误匹配 14.7.1.1/2）
+        // OSPF邻居表列
         if (oid.matches(".*\\.1\\.3\\.6\\.1\\.2\\.1\\.14\\.7\\.1\\.1(\\..+)?$")
                 || oid.matches("^1\\.3\\.6\\.1\\.2\\.1\\.14\\.7\\.1\\.1(\\..+)?$")) {
             trapData.put("ospfNbrIpAddr", value);
@@ -829,7 +830,7 @@ public class SnmpTrapReceiver implements CommandLineRunner {
             trapData.put("ospfNbrAuthFailReason", value);
         }
 
-        // OSPF LSDB 表：Trap 常带长实例后缀，按列 OID 前缀匹配
+        // OSPF LSDB表：Trap常带长实例后缀，按列OID前缀匹配
         if (oid.contains("1.3.6.1.2.1.14.4.1.1.")) {
             trapData.put("ospfLsdbAreaId", value);
         }
@@ -863,7 +864,7 @@ public class SnmpTrapReceiver implements CommandLineRunner {
 
     private void putIfIndex(Map<String, String> trapData, String value, String oid) {
         String idx = value != null ? value.trim() : "";
-        // SNMP4J 有时把 Integer32 打成 "INTEGER: 5"
+        // SNMP4J有时把Integer32打成 "INTEGER: 5"
         if (idx.toUpperCase().startsWith("INTEGER:")) {
             idx = idx.substring(idx.indexOf(':') + 1).trim();
         }
@@ -887,9 +888,6 @@ public class SnmpTrapReceiver implements CommandLineRunner {
         }
     }
     
-    /**
-     * SNMPv1 generic-trap → 标准 snmpTrapOID（仅 0–5；enterpriseSpecific 不在此拼造）。
-     */
     private String mapV1GenericTrapToOid(int generic, int specific, org.snmp4j.smi.OID enterprise) {
         return switch (generic) {
             case 0 -> "1.3.6.1.6.3.1.1.5.1";
@@ -902,7 +900,6 @@ public class SnmpTrapReceiver implements CommandLineRunner {
         };
     }
 
-    /** 标准化 OID 字符串，便于精确匹配 */
     private String normalizeOid(String oid) {
         if (oid == null) {
             return "";
@@ -956,7 +953,7 @@ public class SnmpTrapReceiver implements CommandLineRunner {
         String trapOid = trapData.get("trapOid");
 
         if (trapOid == null || trapOid.isBlank()) {
-            // 无 OID：仅按 v1 genericTrap 识别标准链路事件（不再用 ifOperStatus 猜测，避免误伤）
+            // 无OID：仅按v1 genericTrap识别标准链路事件
             String generic = trapData.get("genericTrap");
             if ("2".equals(generic)) {
                 info.title = "接口断开告警";
@@ -973,7 +970,7 @@ public class SnmpTrapReceiver implements CommandLineRunner {
             return info;
         }
 
-        // 标准 snmpTraps：精确匹配，避免 contains 把 ifType(1.2.1.2.2.1.3) 误判成 LinkUp
+        // 标准snmpTraps：精确匹配，避免contains把ifType(1.2.1.2.2.1.3) 误判成LinkUp
         if (oidIs(trapOid, "1.3.6.1.6.3.1.1.5.1")) {
             info.title = "设备冷启动";
             info.severity = Alarm.Severity.MAJOR;
@@ -1003,7 +1000,7 @@ public class SnmpTrapReceiver implements CommandLineRunner {
             info.severity = Alarm.Severity.WARNING;
             info.type = "厂商告警-思科";
         } else if (isOspfTrapOid(trapOid)) {
-            // OSPF-MIB 标准通知：精确映射，避免落入「通用Trap告警」
+            // OSPF-MIB标准通知：精确映射，避免落入「通用Trap告警」
             applyOspfTrapInfo(info, trapOid, trapData);
         } else if (trapOid.contains("1.3.6.1.2.1.15")) {
             info.title = "BGP邻居状态变更";
@@ -1018,7 +1015,7 @@ public class SnmpTrapReceiver implements CommandLineRunner {
             info.severity = Alarm.Severity.WARNING;
             info.type = "交换告警-STP新根";
         } else if (oidIs(trapOid, "1.3.6.1.2.1.68.0.1")) {
-            // vrrpTrapNewMaster：VRRP 备份组主备切换，新 Master IP 见 VB vrrpOperMasterIpAddr
+            // vrrpTrapNewMaster：VRRP备份组主备切换，新Master IP见VB vrrpOperMasterIpAddr
             info.title = "VRRP主备切换告警";
             info.severity = Alarm.Severity.WARNING;
             info.type = "路由告警-VRRP主备切换";
@@ -1035,12 +1032,12 @@ public class SnmpTrapReceiver implements CommandLineRunner {
             info.severity = Alarm.Severity.WARNING;
             info.type = "路由告警-VRRP非Master状态";
         } else if (oidIs(trapOid, "1.3.6.1.4.1.2011.6.139.13.1.1.1")) {
-            // hwApFaultTrap：AP 下线（与 AC 断连/断电/心跳丢失/license 不足等）
+            // hwApFaultTrap：AP下线
             info.title = "AP下线告警";
             info.severity = Alarm.Severity.MAJOR;
             info.type = "WLAN告警-AP下线";
         } else if (oidIs(trapOid, "1.3.6.1.4.1.2011.6.139.13.1.1.2")) {
-            // hwApNormalTrap：AP 通讯故障恢复（重新上线）
+            // hwApNormalTrap：AP通讯故障恢复
             info.title = "AP上线恢复通知";
             info.severity = Alarm.Severity.INFO;
             info.type = "WLAN告警-AP上线";
@@ -1101,7 +1098,7 @@ public class SnmpTrapReceiver implements CommandLineRunner {
             info.severity = Alarm.Severity.INFO;
             info.type = "性能告警-负载恢复";
         } else if (trapOid.contains("1.3.6.1.4.1.2011.5.25.42.4.2.1")) {
-            // 华为接口状态变更：按 Trap 中携带的 operStatus 判定断开/恢复（真实 VB，非拓扑构造）
+            // 华为接口状态变更：按Trap中携带的operStatus判定断开/恢复
             String oper = firstNonBlank(trapData.get("ifOperStatus"), trapData.get("hwIfOperStatus"));
             if (isOperDown(oper)) {
                 info.title = "接口断开告警";
@@ -1206,10 +1203,6 @@ public class SnmpTrapReceiver implements CommandLineRunner {
         return n.contains("1.3.6.1.2.1.14.16.2.");
     }
 
-    /**
-     * OSPF-MIB 通知（RFC 4750）：1.3.6.1.2.1.14.16.2.*
-     * 例：.13 = ospfMaxAgeLsa（你提供的这条）。
-     */
     private void applyOspfTrapInfo(TrapInfo info, String trapOid, Map<String, String> trapData) {
         String lsId = firstNonBlank(trapData.get("ospfLsdbLsId"));
         String routerId = firstNonBlank(trapData.get("ospfRouterId"), trapData.get("ospfLsdbRouterId"));
@@ -1282,7 +1275,7 @@ public class SnmpTrapReceiver implements CommandLineRunner {
         String n = oid.trim();
         int idx = n.lastIndexOf('.');
         if (idx > 0 && idx + 1 < n.length()) {
-            // 取末两段，便于对照 snmpTrapOID
+            // 取末两段，便于对照snmpTrapOID
             String last = n.substring(idx + 1);
             String head = n.substring(0, idx);
             int idx2 = head.lastIndexOf('.');
@@ -1431,7 +1424,6 @@ public class SnmpTrapReceiver implements CommandLineRunner {
         }
     }
     
-    /** 链路类告警标题附带接口，避免同设备多接口被 5 分钟抑制合并成一条而“看不见” */
     private void enrichLinkAlarmTitle(TrapInfo info, Map<String, String> trapData) {
         if (info == null || info.type == null || !info.type.startsWith("链路告警")) {
             return;

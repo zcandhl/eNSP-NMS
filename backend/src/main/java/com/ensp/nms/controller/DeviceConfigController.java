@@ -21,6 +21,14 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * 设备配置备份、实时拉取、异步任务、合规评估与批量导出接口。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15 */
+
 @RestController
 @RequestMapping("/api/configs")
 @RequiredArgsConstructor
@@ -53,7 +61,6 @@ public class DeviceConfigController {
         }
     }
 
-    /** 列表不含全文；兼容旧调用 */
     @GetMapping("/device/{deviceId}")
     public ResponseEntity<List<DeviceConfigSummary>> getConfigsByDeviceId(@PathVariable Long deviceId) {
         return ResponseEntity.ok(deviceConfigService.getConfigSummariesByDeviceId(deviceId));
@@ -215,7 +222,6 @@ public class DeviceConfigController {
         }
     }
 
-    /** GET 与单文件导出一致，走 configs:read 鉴权，避免 POST blob 触发 401 */
     @GetMapping("/batch-export")
     public ResponseEntity<?> batchExportConfigs(@RequestParam String ids) {
         try {
@@ -250,7 +256,6 @@ public class DeviceConfigController {
         return ids;
     }
 
-    /** 变量集解析：[{room:"501",vlan:"51"},...] → List<Map>；非法项跳过 */
     private static List<Map<String, String>> parseVariableSets(Object raw) {
         List<Map<String, String>> out = new java.util.ArrayList<>();
         if (!(raw instanceof List<?> list)) {
@@ -317,7 +322,6 @@ public class DeviceConfigController {
         }
     }
 
-    /** 异步恢复：立即返回 taskId，前端轮询 /tasks/{id} 获取真实进度 */
     @PostMapping("/tasks/restore")
     public ResponseEntity<Map<String, Object>> startRestoreTask(@RequestBody Map<String, Object> body) {
         try {
@@ -331,7 +335,6 @@ public class DeviceConfigController {
         }
     }
 
-    /** 异步批量下发 */
     @PostMapping("/tasks/batch-apply")
     public ResponseEntity<Map<String, Object>> startBatchTask(@RequestBody Map<String, Object> request) {
         try {
@@ -360,7 +363,7 @@ public class DeviceConfigController {
                 if (deviceIds.isEmpty()) {
                     return ResponseEntity.badRequest().body(Map.of("success", false, "message", "请选择设备"));
                 }
-                // 变量集模式：每组变量渲染一段配置，段×设备逐对下发（分波不支持，waveSize 忽略）
+                // 变量集模式：每组变量渲染一段配置，段×设备逐对下发
                 task = configTaskService.submitBatchVariableSets(deviceIds, content, variableSets, parallel, reason);
             } else {
                 task = configTaskService.submitBatchApply(
@@ -372,7 +375,6 @@ public class DeviceConfigController {
         }
     }
 
-    /** 异步批量备份 */
     @PostMapping("/tasks/batch-backup")
     public ResponseEntity<Map<String, Object>> startBatchBackupTask(@RequestBody Map<String, Object> request) {
         try {

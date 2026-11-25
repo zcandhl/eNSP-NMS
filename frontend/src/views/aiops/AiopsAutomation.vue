@@ -1,3 +1,13 @@
+/**
+ * @file    AiopsAutomation.vue
+ * @module  视图页/智能运维
+ * @desc    智能运维自动化与无人值守页面。
+ *
+ * @author  ZC
+ * @date    2026-08-15 * @version 1.0.0
+ * @requires element-plus, vue, @/api/device
+ */
+
 <template>
   <div class="aiops-auto" v-loading="loading">
     <div class="auto-bar">
@@ -128,7 +138,7 @@ async function togglePause() {
     ElMessage.success(res?.message || '已更新')
     await load()
     hubRefresh?.()
-  } catch { /* cancel */ }
+  } catch {  }
 }
 
 async function runCycle() {
@@ -160,7 +170,7 @@ async function retry(row) {
     const res = await aiopsApi.retryUnattendedRun(row.id)
     ElMessage.success(res?.message || '已重试')
     await load()
-  } catch { /* cancel */ }
+  } catch {  }
 }
 
 onMounted(load)

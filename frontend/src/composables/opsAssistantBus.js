@@ -1,8 +1,15 @@
+/**
+ * @file    opsAssistantBus.js
+ * @module  组合式逻辑
+ * @desc    运维助手跨组件事件总线。
+ *
+ * @author  ZC
+ * @date    2026-08-15 * @version 1.0.0
+ * @requires vue
+ */
+
 import { reactive, readonly } from 'vue'
 
-/**
- * 业务页 / 顶栏 / 快捷键 → 悬浮运维助手 的焦点上下文总线。
- */
 const state = reactive({
   deviceId: null,
   alarmId: null,
@@ -11,7 +18,7 @@ const state = reactive({
   source: '',
   updatedAt: 0,
   expandRequest: 0,
-  /** 递增后聚焦输入框 */
+  
   focusInputRequest: 0,
   lastResult: null,
   recommendedTools: [],
@@ -57,7 +64,6 @@ export function setOpsAssistantContext(payload = {}) {
   }
 }
 
-/** 随时唤起助手（顶栏 / Ctrl+K）：打开面板并聚焦输入，不自动提问 */
 export function openOpsAssistant(payload = {}) {
   setOpsAssistantContext({
     ...payload,

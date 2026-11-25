@@ -80,7 +80,7 @@ CREATE TABLE IF NOT EXISTS device_port (
     INDEX idx_port_name (port_name)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='设备端口表';
 
--- 告警表（为第二阶段预留）
+-- 告警表
 CREATE TABLE IF NOT EXISTS alarm (
     id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '告警ID',
     device_id BIGINT COMMENT '设备ID',

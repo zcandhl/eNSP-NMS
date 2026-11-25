@@ -10,6 +10,14 @@ import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.Set;
 
+/**
+ * 用户实体，保存账号凭据与账号状态。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15 */
+
 @Data
 @Entity
 @Table(name = "app_user")
@@ -50,7 +58,6 @@ public class User {
     @Column(name = "locked_until")
     private LocalDateTime lockedUntil;
 
-    /** 首次登录或管理员重置后须改密 */
     @Column(name = "must_change_password", nullable = false)
     private Boolean mustChangePassword = false;
 

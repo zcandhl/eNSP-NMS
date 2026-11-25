@@ -14,8 +14,13 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 
 /**
- * 无 Docker 部署时由后端托管 frontend 构建目录（./web），实现单端口访问。
- */
+ * 无Docker部署时由后端托管frontend构建目录，实现单端口访问。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15 */
+
 @Configuration
 public class SpaWebConfig implements WebMvcConfigurer {
 
@@ -45,7 +50,7 @@ public class SpaWebConfig implements WebMvcConfigurer {
                         if (requested != null && requested.exists()) {
                             return requested;
                         }
-                        // Vue Router history：无实体文件时回退 index.html
+                        // Vue Router history：无实体文件时回退index.html
                         if (resourcePath.startsWith("api/") || resourcePath.startsWith("ws/")) {
                             return null;
                         }

@@ -1,17 +1,22 @@
+/**
+ * @file    useOpsInlinePanel.js
+ * @module  组合式逻辑
+ * @desc    行内运维面板显隐与状态管理。
+ *
+ * @author  ZC
+ * @date    2026-08-15 * @version 1.0.0
+ * @requires vue, @/composables/opsAssistantBus
+ */
+
 import { ref, watch } from 'vue'
 import { useOpsAssistantBus } from '@/composables/opsAssistantBus'
 
-/** 跨组件打开指定页的内嵌辅助栏 */
 const openRequests = ref({ key: '', token: 0 })
 
 export function requestOpenOpsInline(storageKey) {
   openRequests.value = { key: String(storageKey || ''), token: Date.now() }
 }
 
-/**
- * 页内智能辅助侧栏：默认收起，按需展开；记忆本地偏好。
- * autoAsk / expandRequest / requestOpenOpsInline 时自动展开。
- */
 export function useOpsInlinePanel(storageKey, { defaultOpen = false } = {}) {
   const key = `ops_inline_open_${storageKey || 'default'}`
   const bus = useOpsAssistantBus()
@@ -22,7 +27,7 @@ export function useOpsInlinePanel(storageKey, { defaultOpen = false } = {}) {
       const v = localStorage.getItem(key)
       if (v === '1') return true
       if (v === '0') return false
-    } catch { /* ignore */ }
+    } catch {  }
     return defaultOpen
   }
 
@@ -32,7 +37,7 @@ export function useOpsInlinePanel(storageKey, { defaultOpen = false } = {}) {
     open.value = !!next
     try {
       localStorage.setItem(key, open.value ? '1' : '0')
-    } catch { /* ignore */ }
+    } catch {  }
   }
 
   function toggle() {
@@ -60,7 +65,7 @@ export function useOpsInlinePanel(storageKey, { defaultOpen = false } = {}) {
     }
   )
 
-  // 挂载时补一次：按钮已点但侧栏当时未挂载（如曾按 Tab 条件渲染）
+  // 挂载时补一次：按钮已点但侧栏当时未挂载
   if (
     openRequests.value.key === pageKey &&
     openRequests.value.token &&

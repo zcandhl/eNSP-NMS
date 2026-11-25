@@ -19,6 +19,14 @@ import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
+/**
+ * Web 终端会话封装，维护连接与命令、尺寸转发。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15 */
+
 @Slf4j
 public class SshSession {
 
@@ -30,7 +38,6 @@ public class SshSession {
     private final SshClient sshClient;
     private Session sshSession;
     private ChannelShell channel;
-    /** telnet 会话载体（AC6005 等 SSH 不可用的设备）；ssh 设备为 null */
     private SshClient.ShellTransport telnetTransport;
     private OutputStream sshOut;
     private InputStream sshIn;
@@ -54,8 +61,8 @@ public class SshSession {
 
         try {
             if (telnet) {
-                // AC6005 的 SSH 服务在 eNSP 中不可用（连接即无响应），走 telnet 交互通道。
-                // sshClient 由 Handler 注入（携带超时等配置），不可直接 new。
+                // AC类设备SSH服务不可用，走telnet交互通道。
+                // sshClient由Handler注入，不可直接new。
                 telnetTransport = sshClient.openInteractive(
                         device.getIpAddress(), port, device.getSshUsername(), sshPassword,
                         SshClient.PROTOCOL_TELNET);
@@ -96,7 +103,7 @@ public class SshSession {
             log.info("连接Shell通道...");
             channel.connect(10000);
 
-            // 不在此处强发 screen-length，避免回显与半包打乱首屏；由用户自行配置更稳妥
+            // 不在此处强发screen-length，避免回显与半包打乱首屏；由用户自行配置更稳妥
             log.info("启动输出读取线程...");
             startOutputThread();
 
@@ -174,7 +181,6 @@ public class SshSession {
         }
     }
 
-    /** 使用 Jackson 序列化，正确转义 ESC/控制字符，避免前端 JSON.parse 失败 */
     private String buildJson(String type, String payload) throws IOException {
         Map<String, String> msg = new HashMap<>();
         msg.put("type", type);
@@ -194,7 +200,6 @@ public class SshSession {
         }
     }
 
-    /** 同步远端 PTY 行列，随 Web 终端窗口缩放（telnet 无 PTY 概念，忽略） */
     public void resizePty(int cols, int rows) {
         if (telnetTransport != null) {
             return;
@@ -242,10 +247,10 @@ public class SshSession {
         }
         try {
             if (sshIn != null) sshIn.close();
-        } catch (IOException e) { /* ignore */ }
+} catch (IOException e) { /* ignore */ }
         try {
             if (sshOut != null) sshOut.close();
-        } catch (IOException e) { /* ignore */ }
+} catch (IOException e) { /* ignore */ }
         if (telnetTransport != null) {
             telnetTransport.close();
             telnetTransport = null;

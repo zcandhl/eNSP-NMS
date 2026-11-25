@@ -12,6 +12,14 @@ import org.springframework.stereotype.Repository;
 
 import java.util.List;
 
+/**
+ * 配置变更日志数据访问仓库：封装对应实体的持久化查询与写入。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15 */
+
 @Repository
 public interface ConfigChangeLogRepository extends JpaRepository<ConfigChangeLog, Long>,
         JpaSpecificationExecutor<ConfigChangeLog> {
@@ -22,7 +30,6 @@ public interface ConfigChangeLogRepository extends JpaRepository<ConfigChangeLog
 
     Page<ConfigChangeLog> findAllByOrderByCreatedAtDesc(Pageable pageable);
 
-    /** bulk delete：立即执行 SQL，避免与父表 device 删除的 flush 顺序冲突 */
     @Modifying
     @Query("DELETE FROM ConfigChangeLog l WHERE l.deviceId = :deviceId")
     int deleteAllByDeviceId(@Param("deviceId") Long deviceId);

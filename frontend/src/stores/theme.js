@@ -1,9 +1,18 @@
+/**
+ * @file    theme.js
+ * @module  状态管理/主题
+ * @desc    主题与外观状态持久化。
+ *
+ * @author  ZC
+ * @date    2026-08-15 * @version 1.0.0
+ * @requires pinia, vue
+ */
+
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 
 const STORAGE_KEY = 'ensp-nms-theme'
 
-/** 主题色预设（商用网管常见配色） */
 export const ACCENT_PRESETS = [
   {
     id: 'ocean',
@@ -103,7 +112,6 @@ export const ACCENT_PRESETS = [
   }
 ]
 
-/** 外观：侧栏 / 整体明暗 */
 export const SHELL_PRESETS = [
   {
     id: 'light',

@@ -1,3 +1,14 @@
+/**
+ * @file    AiopsOverview.vue
+ * @module  视图页/智能运维
+ * @desc    智能运维概览指标页。
+ *
+ * @author  ZC
+ * @date    2026-08-15
+ * @version 1.0.0
+ * @requires element-plus, vue, vue-router, @/api/device, @/composables/inspectReportStore
+ */
+
 <template>
   <div class="aiops-overview" v-loading="loading">
     <div class="ov-kpi">

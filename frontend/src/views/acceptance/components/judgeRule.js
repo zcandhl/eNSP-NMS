@@ -1,13 +1,13 @@
+
 /**
- * 判定规则的“人话”层。
+ * @file    judgeRule.js
+ * @module  视图页/验收组件
+ * @desc    验收判定规则文案与阈值计算。
  *
- * 目的：学生看不懂 assertExpr（SpEL 表达式），改成
- *   「指标」 + 「比较方式」 + 「目标」 三段式，并实时回显一句中文。
- * 生成的仍然是同一条 assertExpr，后端判定引擎（SpEL）不需要任何改动，
- * 老方案里已有的表达式在打开时会被反向解析回三段式；解析不出来就退回高级模式。
+ * @author  ZC
+ * @date    2026-11-22 * @version 1.0.0
  */
 
-/** 各检查类型可比较的实测指标（key 必须与后端 metrics 里的名字一致） */
 export const METRICS = {
   TOPOLOGY_MATCH: [
     { key: 'topology.total', label: '实测纳管节点数', kind: 'number', unit: '台' },
@@ -47,7 +47,6 @@ export const METRICS = {
   ]
 };
 
-/** 比较方式（按指标类型给不同选项） */
 const OPS = {
   number: [
     { op: '>=', label: '不少于' },
@@ -81,10 +80,6 @@ export function opList(type, metricKey) {
   return OPS[def?.kind || 'number'] || OPS.number
 }
 
-/**
- * 解析已有表达式 → 规则条目数组；解析不了返回 null（界面退回高级模式）。
- * 支持形如 `a >= b`、`a == true`、`a == b and c == d`
- */
 export function parseExpr(expr, type, paramKeys = []) {
   const raw = String(expr || '').trim()
   if (!raw) return null
@@ -123,7 +118,6 @@ export function parseExpr(expr, type, paramKeys = []) {
   return items.length ? items : null
 }
 
-/** 规则条目 → 可执行的表达式 */
 export function buildExpr(items, type) {
   if (!items || !items.length) return ''
   return items
@@ -140,7 +134,6 @@ export function buildExpr(items, type) {
     .join(' and ')
 }
 
-/** 目标的中文说法 */
 function targetText(it, type, params, fieldLabel) {
   const def = metricDef(type, it.metric)
   if (def?.kind === 'bool') return ''
@@ -156,20 +149,13 @@ function targetText(it, type, params, fieldLabel) {
   return `${it.targetValue}${unit}`
 }
 
-/**
- * 规则 → 一句中文。
- * @param items 规则条目
- * @param type  检查类型
- * @param params 方案参数（用于显示“方案填 2”）
- * @param fieldLabel (key)=>中文名，从 check-types 的 fields 里取
- */
 export function describe(items, type, params, fieldLabel = (k) => k) {
   if (!items || !items.length) return ''
   const parts = items.map((it) => {
     const def = metricDef(type, it.metric)
     const metricLabel = def?.label || it.metric
     if (def?.kind === 'bool') {
-      // trueText/falseText 本身就是完整短语（如“输出中不出现匹配内容”），直接成句
+      // trueText/falseText本身就是完整短语，直接成句
       return it.op === '==true' ? def.trueText || '输出中出现匹配内容' : def.falseText || '输出中不出现匹配内容'
     }
     const opLabel = (OPS[def?.kind || 'number'] || OPS.number).find((o) => o.op === it.op)?.label || it.op
@@ -178,19 +164,10 @@ export function describe(items, type, params, fieldLabel = (k) => k) {
   return `当${parts.join('，并且')}时，判定通过`
 }
 
-/**
- * 老方案里没有 rule 时，用 check-types 的 assertHint 兜底解析；
- * 解析失败返回空数组，由界面引导用户手工选三项。
- */
 export function fromHint(hint, type, paramKeys) {
   return parseExpr(hint, type, paramKeys) || []
 }
 
-/**
- * 运行时指标的中文标签。
- * 优先用带类型前缀的完整 key（如 vrrp.masterCount）；后端 metrics 输出的是裸键
- * （如 masterCount、scopedDevices），这里给裸键兜底映射。
- */
 export const METRIC_KEY_LABEL = {
   masterCount: '主用组数',
   backupCount: '备用组数',
@@ -217,7 +194,6 @@ export const METRIC_KEY_LABEL = {
   noBaseline: '未找到基线'
 }
 
-/** 单个指标的中文标签：先按类型前缀精确匹配，再退裸键 */
 export function metricLabel(type, key) {
   const def = metricList(type).find((m) => m.key === key)
   if (def) return def.label
@@ -231,13 +207,6 @@ function metricValueText(v) {
   return s.length > 60 ? `${s.slice(0, 60)}…` : s
 }
 
-/**
- * 统一出口：实测指标 → 中文串。
- * 所有显示“关键实测值”的地方（工作台、批次面板、报告页、Word 报告）都走这个函数；
- * 内部 detail 字段不展示（拓扑可视化单独消费）。
- * @param type 检查类型（可为空，仅用裸键映射）
- * @param metrics 后端 metrics 对象
- */
 export function metricsText(type, metrics) {
   if (!metrics || typeof metrics !== 'object') return ''
   const parts = Object.entries(metrics)
@@ -246,11 +215,6 @@ export function metricsText(type, metrics) {
   return parts.join('；')
 }
 
-/**
- * 统一出口：任意检查项对象 → 一句中文判定。
- * 所有显示“判定准则”的地方（方案设计、工作台、报告页、mock 文本报告）
- * 都走这个函数，保证口径一致；解析不了时返回空串，由调用方回退显示表达式。
- */
 export function describeCheck(check, checkTypes = []) {
   if (!check) return ''
   const fields = checkTypes.find((t) => t.type === check.type)?.fields || []

@@ -9,6 +9,14 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import java.time.LocalDateTime;
 import java.util.Map;
 
+/**
+ * 设备台账实体，保存纳管设备的连接信息与运行状态。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15 */
+
 @Data
 @Entity
 @Table(name = "device")
@@ -24,15 +32,12 @@ public class Device {
     @Column(name = "ip_address", nullable = false, length = 45)
     private String ipAddress;
 
-    /** router|switch|firewall|ac|ap|pc|server|other */
     @Column(name = "device_type", length = 20)
     private String deviceType = "other";
 
-    /** snmp|icmp|auto */
     @Column(name = "monitor_mode", length = 20)
     private String monitorMode = "auto";
 
-    /** 最近一次状态探测方式：snmp / icmp */
     @Column(name = "last_probe_method", length = 20)
     private String lastProbeMethod;
 
@@ -64,10 +69,6 @@ public class Device {
     @Column(name = "ssh_port")
     private Integer sshPort = 22;
 
-    /**
-     * 远程管理协议：ssh | telnet
-     * <p>AC6005 在 eNSP 中 SSH 服务异常（KEXINIT 后无响应），AC 类设备统一走 telnet。</p>
-     */
     @Column(name = "management_protocol", length = 10)
     private String managementProtocol = "ssh";
 
@@ -84,19 +85,15 @@ public class Device {
     @Column(name = "group_id")
     private Long groupId;
 
-    /** 所属工程（网络工程档案），全软件共享的工程上下文 */
     @Column(name = "project_id")
     private Long projectId;
 
-    /** 机房/机柜/位置等资产信息 */
     @Column(length = 200)
     private String location;
 
-    /** 运维联系人 */
     @Column(length = 100)
     private String contact;
 
-    /** 序列号 */
     @Column(name = "serial_number", length = 100)
     private String serialNumber;
 

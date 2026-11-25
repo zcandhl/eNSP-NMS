@@ -6,6 +6,15 @@ import lombok.Data;
 
 import java.time.LocalDateTime;
 
+/**
+ * 性能告警实体，记录越限指标与告警状态。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15
+ */
+
 @Data
 @Entity
 @Table(name = "performance_alerts")

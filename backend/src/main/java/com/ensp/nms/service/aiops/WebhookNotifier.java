@@ -16,8 +16,13 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * AIOps 收敛摘要 Webhook 推送（异步）。
- */
+ * AIOps收敛摘要Webhook异步推送。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15 */
+
 @Slf4j
 @Service
 @RequiredArgsConstructor

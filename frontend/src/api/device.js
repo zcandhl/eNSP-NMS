@@ -1,3 +1,12 @@
+/**
+ * @file    device.js
+ * @module  接口层/设备
+ * @desc    设备与配置相关后端接口封装。
+ *
+ * @author  ZC
+ * @date    2026-08-15 * @version 1.0.0
+ */
+
 import request from './index'
 
 export const deviceApi = {
@@ -43,25 +52,25 @@ export const deviceApi = {
   refreshDevice(id) {
     return request.post(`/devices/${id}/refresh`)
   },
-  /** 兼容：同步扫描并自动入库 */
+  
   discoverDevices(network, timeout, community = 'public', snmpPort = 161) {
     return request.post('/devices/discover', { network, timeout, community, snmpPort })
   },
-  /** 异步扫描（不入库） */
+  
   startDiscoverScan(payload) {
     return request.post('/devices/discover/scan', payload)
   },
   getDiscoverJob(jobId) {
     return request.get(`/devices/discover/jobs/${jobId}`)
   },
-  /** candidates 入库；projectId 传入当前工程，让新设备直接归属该工程 */
+  
   importDiscovered(candidates, projectId) {
     return request.post('/devices/discover/import', {
       candidates,
       ...(projectId ? { projectId } : {})
     })
   },
-  /** 从交换机 ARP 发现终端（虚拟 PC）候选 */
+  
   discoverEndpoints() {
     return request.post('/devices/discover/endpoints')
   },
@@ -73,7 +82,7 @@ export const deviceApi = {
 export const performanceApi = {
   getLatestPerformance(deviceId) {
     return request.get(`/performance/device/${deviceId}/latest`).catch((err) => {
-      // 兼容旧后端 404：尚无性能样本时视为空
+      // 兼容旧后端404：尚无性能样本时视为空
       if (err?.response?.status === 404) return null
       throw err
     })
@@ -242,7 +251,6 @@ export const llmApi = {
   }
 }
 
-/** 告警查询参数序列化：数组用重复键 status=A&status=B，避免 axios 默认 status[]= 导致后端收不到 */
 function alarmQueryConfig(params = {}, extra = {}) {
   return {
     params: { ...params },
@@ -271,7 +279,7 @@ export const alarmApi = {
   queryAlarms(params = {}) {
     return request.get('/alarms/query', alarmQueryConfig(params))
   },
-  /** 按当前筛选导出 CSV（blob） */
+  
   exportAlarms(params = {}) {
     return request.get('/alarms/export', alarmQueryConfig(params, { responseType: 'blob' }))
   },

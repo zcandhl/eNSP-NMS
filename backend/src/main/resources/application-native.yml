@@ -1,4 +1,4 @@
-# 教师机无 Docker 原生部署
+# 教师机无Docker原生部署
 # 启动：java -jar app.jar --spring.profiles.active=native
 server:
   port: ${SERVER_PORT:8080}
@@ -26,7 +26,7 @@ auth:
     secret: ${AUTH_JWT_SECRET:ensp-nms-native-change-me-secret-32b}
     expiration-ms: ${AUTH_JWT_EXPIRATION_MS:86400000}
   cors:
-    # 前后端同端口（JAR 托管 web/）时同源
+    # 前后端同端口（JAR托管web/）时同源
     allowed-origins: ${AUTH_CORS_ORIGINS:http://localhost:8080,http://127.0.0.1:8080}
 
 logging:
@@ -38,7 +38,7 @@ snmp:
   trap:
     port: ${SNMP_TRAP_PORT:162}
 
-# 前端构建产物目录（相对 JAR 工作目录），见 deploy/native/
+# 前端构建产物目录（相对JAR工作目录），见deploy/native/
 nms:
   web:
     static-dir: ${NMS_WEB_STATIC_DIR:./web}

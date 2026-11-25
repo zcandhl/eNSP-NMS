@@ -1,3 +1,13 @@
+/**
+ * @file    TwinTopology.vue
+ * @module  视图页/验收组件
+ * @desc    验收双子拓扑对照视图。
+ *
+ * @author  ZC
+ * @date    2026-11-22 * @version 1.0.0
+ * @requires vue
+ */
+
 <template>
   <div class="twin-card">
     <div class="twin-head">
@@ -14,7 +24,7 @@
     <div v-if="loading" class="twin-loading">拓扑加载中…</div>
     <div v-else-if="!nodes.length" class="twin-loading">暂无拓扑数据（先在拓扑页发现/保存设备）</div>
     <svg v-else class="twin-svg" :viewBox="viewBox" preserveAspectRatio="xMidYMid meet" @click="selected = null">
-      <!-- 链路 -->
+      
       <line
         v-for="l in renderedLinks"
         :key="l.key"
@@ -22,7 +32,7 @@
         :stroke="l.color"
         stroke-width="1.5"
       />
-      <!-- 节点 -->
+      
       <g
         v-for="n in styled"
         :key="n.id"
@@ -55,12 +65,6 @@
 import { computed, onMounted, ref } from 'vue'
 import { topologyApi } from '../../../api/topology'
 
-/**
- * 验收数字孪生视图：复用平台拓扑数据（/api/topology），
- * 在真实拓扑坐标上叠加设备在线状态与本批次可达性结果。
- * 采集手段仍是 SSH/探测，呈现层是结构化的"整体拓扑 + 状态着色"，
- * 对应答辩口径：采集层（SSH）→ 数据层 → 呈现层（孪生视图）解耦，采集器未来可换 NETCONF 遥测。
- */
 const props = defineProps({
   batch: { type: Object, default: null }
 })
@@ -73,7 +77,6 @@ const selected = ref(null)
 const TYPE_GLYPH = { router: 'R', switch: 'S', ac: 'A', firewall: 'F', other: 'D' }
 const TYPE_LABEL = { router: '路由器', switch: '交换机', ac: '无线控制器', firewall: '防火墙', other: '设备' }
 
-/** 批次可达性结果按设备名索引（REACHABILITY 项的 detail 列表） */
 const reachByName = computed(() => {
   const map = {}
   if (!props.batch || !Array.isArray(props.batch.items)) return map
@@ -94,7 +97,7 @@ const batchOverlayHint = computed(() =>
 const nodesWithPos = computed(() => {
   const list = nodes.value
   const positioned = list.filter((n) => (n.x || 0) !== 0 || (n.y || 0) !== 0)
-  // 全部无坐标时环形兜底排布，保证演示环境未摆位也能看
+  // 全部无坐标时环形兜底排布，保证未配置坐标时也能展示拓扑
   if (positioned.length < list.length || positioned.length === 0) {
     const cx = 260
     const cy = 150
@@ -241,7 +244,7 @@ onMounted(load)
 }
 .twin-svg {
   width: 100%;
-  /* 视口矮时自动收缩，避免把上方运行结果区挤掉 */
+  
   height: clamp(200px, 26vh, 300px);
   background:
     radial-gradient(circle, var(--el-fill-color-light) 1px, transparent 1px) 0 0 / 22px 22px;

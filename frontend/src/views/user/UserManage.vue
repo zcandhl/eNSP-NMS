@@ -1,3 +1,13 @@
+/**
+ * @file    UserManage.vue
+ * @module  视图页/用户
+ * @desc    用户、角色与权限矩阵管理页。
+ *
+ * @author  ZC
+ * @date    2026-08-15 * @version 1.0.0
+ * @requires @element-plus/icons-vue, element-plus, vue, vue-router, @/api/device, @/stores/auth
+ */
+
 <template>
   <div class="nms-page user-manage">
     <div class="nms-page-header">
@@ -64,7 +74,6 @@
 
     <el-card class="content-card" shadow="never">
       <el-tabs v-model="activeTab">
-        <!-- 账号 -->
         <el-tab-pane v-if="auth.hasPermission('users:manage')" label="账号" name="users">
           <div class="toolbar">
             <el-input
@@ -160,7 +169,6 @@
           <el-empty v-if="!userLoading && !filteredUsers.length" description="无匹配用户" />
         </el-tab-pane>
 
-        <!-- 角色 -->
         <el-tab-pane v-if="auth.hasPermission('roles:manage')" label="角色" name="roles">
           <el-alert
             type="info"
@@ -230,7 +238,6 @@
           <el-empty v-if="!roleLoading && !filteredRoles.length" description="无匹配角色" />
         </el-tab-pane>
 
-        <!-- 权限矩阵 -->
         <el-tab-pane
           v-if="auth.hasPermission('roles:manage')"
           label="权限矩阵"
@@ -291,7 +298,6 @@
       </el-tabs>
     </el-card>
 
-    <!-- 生效权限抽屉 -->
     <el-drawer v-model="effDrawerVisible" :title="`生效权限 — ${effUser?.username || ''}`" size="480px">
       <p class="eff-summary">合并全部角色权限（去重），只读展示</p>
       <div v-loading="effLoading">
@@ -309,7 +315,6 @@
       </div>
     </el-drawer>
 
-    <!-- 用户编辑 -->
     <el-dialog
       v-model="userDialogVisible"
       :title="editingUser ? '编辑用户' : '新增用户'"
@@ -366,7 +371,6 @@
       </template>
     </el-dialog>
 
-    <!-- 重置密码 -->
     <el-dialog v-model="passwordDialogVisible" title="重置密码" width="460px" destroy-on-close>
       <el-form ref="passwordFormRef" :model="passwordForm" :rules="passwordRules" label-width="90px">
         <el-form-item label="用户名">
@@ -390,7 +394,6 @@
       </template>
     </el-dialog>
 
-    <!-- 角色权限 -->
     <el-dialog
       v-model="roleDialogVisible"
       :title="editingRole ? `配置权限 — ${editingRole.displayName || editingRole.name}` : '新增角色'"
@@ -412,7 +415,7 @@
             v-model="baselineRoleName"
             clearable
             filterable
-            placeholder="从系统角色套用权限基线（非演示账号）"
+            placeholder="从系统角色套用权限基线"
             style="width: 100%"
             @change="applyBaseline"
           >
@@ -769,13 +772,13 @@ async function refreshSessionIfNeeded(affectedUsernames = []) {
   try {
     const me = auth.user?.username
     const selfAffected = !affectedUsernames.length || (me && affectedUsernames.includes(me))
-    // 角色权限变更会 bump 全局版本，操作者需立即换票
+    // 角色权限变更会bump全局版本，操作者需立即换票
     await auth.fetchMe()
     if (selfAffected) {
       ElMessage.info('会话权限已刷新；其他在线会话需重新登录')
     }
   } catch {
-    // 401 拦截器会处理
+    // 401拦截器会处理
   }
 }
 

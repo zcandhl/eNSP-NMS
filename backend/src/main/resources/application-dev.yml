@@ -24,12 +24,6 @@ spring:
       port: 6379
       database: 0
 
-influxdb:
-  url: http://localhost:8086
-  token: your-influxdb-token
-  org: ensp-nms
-  bucket: performance
-
 snmp:
   community: public
   port: 161

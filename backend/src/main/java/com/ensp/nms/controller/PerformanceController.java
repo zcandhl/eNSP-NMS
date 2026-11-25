@@ -13,6 +13,14 @@ import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.List;
 
+/**
+ * 设备最新指标、历史趋势与端口指标查询接口。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15 */
+
 @RestController
 @RequestMapping("/api/performance")
 @CrossOrigin(origins = "*")
@@ -23,7 +31,7 @@ public class PerformanceController {
 
     @GetMapping("/device/{deviceId}/latest")
     public ResponseEntity<PerformanceData> getLatestPerformance(@PathVariable Long deviceId) {
-        // 新设备尚未完成首轮采集时返回 null（200），避免前端把 404 当成加载失败
+        // 新设备尚未完成首轮采集时返回null（200），避免前端把404当成加载失败
         PerformanceData data = performanceMonitorService.getLatestPerformance(deviceId);
         return ResponseEntity.ok(data);
     }
@@ -46,7 +54,6 @@ public class PerformanceController {
         return ResponseEntity.ok(data);
     }
 
-    /** 兼容本地时间与带 Z 的 ISO 字符串，避免历史查询因解析失败返回空 */
     private LocalDateTime parseDateTime(String value) {
         if (value == null || value.isBlank()) {
             return LocalDateTime.now();

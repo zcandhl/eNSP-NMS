@@ -3,6 +3,14 @@ package com.ensp.nms.entity;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
+/**
+ * 智能运维策略参数实体，保存窗口、阈值与开关配置。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15 */
+
 @Entity
 @Table(name = "aiops_policy_settings")
 public class AiopsPolicySettings {
@@ -59,15 +67,12 @@ public class AiopsPolicySettings {
     @Column(name = "webhook_min_severity", length = 20)
     private String webhookMinSeverity = "MAJOR";
 
-    /** 连续探测成功次数达到后判恢复 */
     @Column(name = "online_after_successes")
     private Integer onlineAfterSuccesses = 2;
 
-    /** 连续探测失败次数达到后判离线 */
     @Column(name = "offline_after_failures")
     private Integer offlineAfterFailures = 2;
 
-    /** manual | unattended */
     @Column(name = "llm_ops_mode", length = 20)
     private String llmOpsMode = "manual";
 

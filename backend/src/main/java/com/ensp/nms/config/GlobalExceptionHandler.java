@@ -1,5 +1,7 @@
 package com.ensp.nms.config;
 
+import com.ensp.nms.ssh.SshConnectException;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
@@ -13,6 +15,15 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+/**
+ * 全局异常处理，统一参数校验、认证授权与业务异常的响应格式。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15 */
+
+@Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
@@ -39,10 +50,16 @@ public class GlobalExceptionHandler {
         return body(HttpStatus.BAD_REQUEST, ex.getMessage());
     }
 
-    @ExceptionHandler(RuntimeException.class)
-    public ResponseEntity<Map<String, Object>> handleRuntime(RuntimeException ex) {
-        String message = ex.getMessage() != null ? ex.getMessage() : "服务器错误";
-        return body(HttpStatus.BAD_REQUEST, message);
+    @ExceptionHandler(SshConnectException.class)
+    public ResponseEntity<Map<String, Object>> handleSshConnect(SshConnectException ex) {
+        log.warn("设备连接失败 {}:{} - {}", ex.getHost(), ex.getPort(), ex.getMessage());
+        return body(HttpStatus.BAD_GATEWAY, ex.getMessage());
+    }
+
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<Map<String, Object>> handleUnexpected(Exception ex) {
+        log.error("未处理异常", ex);
+        return body(HttpStatus.INTERNAL_SERVER_ERROR, "服务器内部错误");
     }
 
     private ResponseEntity<Map<String, Object>> body(HttpStatus status, String message) {

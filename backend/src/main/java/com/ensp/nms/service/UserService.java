@@ -25,6 +25,14 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+/**
+ * 用户账号、凭据、锁定状态与权限关联业务处理。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15 */
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -134,7 +142,6 @@ public class UserService {
         userRepository.save(user);
     }
 
-    /** 当前用户修改自己的密码（登录后强制改密 / 自助改密） */
     @Transactional
     public void changeOwnPassword(String username, String oldPassword, String newPassword) {
         User user = userRepository.findByUsername(username)
@@ -208,7 +215,6 @@ public class UserService {
         userRepository.save(user);
     }
 
-    /** 合并角色权限，按 resource 分组（只读视图） */
     public List<Map<String, Object>> getEffectivePermissions(Long userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("用户不存在"));

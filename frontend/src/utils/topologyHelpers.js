@@ -1,3 +1,12 @@
+/**
+ * @file    topologyHelpers.js
+ * @module  工具函数
+ * @desc    拓扑节点、链路布局与坐标辅助计算。
+ *
+ * @author  ZC
+ * @date    2026-08-15 * @version 1.0.0
+ */
+
 export function normalizeLink(raw) {
   const l = raw || {}
   return {
@@ -61,7 +70,6 @@ export function findPortMetric(ports, portName) {
   )
 }
 
-/** 解析带宽字符串为 bps，如 1G / 100Mbps / 1000 */
 export function parseBandwidthBps(bw) {
   if (bw == null || bw === '') return null
   if (typeof bw === 'number' && Number.isFinite(bw)) return bw > 1e6 ? bw : bw * 1e6
@@ -89,9 +97,6 @@ function isPortUp(metric) {
   return s === 'up' || s === '1'
 }
 
-/**
- * 综合链路配置状态、端点在线、端口 operStatus、利用率，生成画布边样式
- */
 export function resolveLinkVisual({
   link,
   sourceOnline = true,
@@ -191,14 +196,13 @@ export function applyAlertSummaryToDevices(deviceList, alertSummary) {
     const ipKey = (d.ipAddress || '').trim()
     const fromDevice = byDevice[key]
     const fromIp = ipKey ? byIp[ipKey] : null
-    // byIp 仅孤儿告警，与 byDevice 累加，与告警查询口径一致
+    // byIp仅孤儿告警，与byDevice累加，与告警查询口径一致
     const count = Number(fromDevice?.count || 0) + Number(fromIp?.count || 0)
     const severe = !!(fromDevice?.severe || fromIp?.severe)
     return { ...d, alertCount: count, alertSevere: severe }
   })
 }
 
-/** BFS 最短路径（无向） */
 export function findShortestPath(links, fromId, toId) {
   const from = String(fromId)
   const to = String(toId)

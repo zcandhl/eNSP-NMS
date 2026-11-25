@@ -1,3 +1,14 @@
+/**
+ * @file    index.js
+ * @module  接口层/基础
+ * @desc    Axios 实例与请求、响应拦截器封装。
+ *
+ * @author  ZC
+ * @date    2026-08-15
+ * @version 1.0.0
+ * @requires axios, element-plus
+ */
+
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
 

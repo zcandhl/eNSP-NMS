@@ -1,3 +1,13 @@
+/**
+ * @file    HeaderAlarmBell.vue
+ * @module  通用组件
+ * @desc    顶栏告警铃铛与未读提示组件。
+ *
+ * @author  ZC
+ * @date    2026-08-15 * @version 1.0.0
+ * @requires vue, vue-router, @/api/device, @/composables/useVisibilityPoller, @/stores/auth
+ */
+
 <template>
   <el-popover
     v-if="auth.hasPermission('alarms:read')"
@@ -173,7 +183,7 @@ const refreshStats = async () => {
     majorCount.value = Number(stats?.majorActiveCount || 0)
     ackCount.value = Number(stats?.acknowledgedCount || 0)
   } catch {
-    /* 静默 */
+    
   }
 }
 

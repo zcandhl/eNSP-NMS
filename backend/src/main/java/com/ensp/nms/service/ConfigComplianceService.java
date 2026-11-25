@@ -14,8 +14,13 @@ import java.util.Map;
 import java.util.regex.Pattern;
 
 /**
- * 配置合规基线（实验室 MVP）：固定规则对 running/备份文本评分，非完整策略引擎。
- */
+ * 配置合规基线：固定规则对running/备份文本评分。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15 */
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -47,9 +52,6 @@ public class ConfigComplianceService {
         return out;
     }
 
-    /**
-     * @param source live | backup（默认优先 live，失败回退最新备份）
-     */
     public Map<String, Object> evaluate(Long deviceId, String source) {
         Device device = deviceRepository.findById(deviceId)
                 .orElseThrow(() -> new IllegalArgumentException("设备不存在"));

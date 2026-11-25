@@ -9,6 +9,15 @@ import org.springframework.stereotype.Service;
 import java.util.*;
 import java.util.stream.Collectors;
 
+/**
+ * 权限清单、权限分组与按编号集合查询。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15
+ */
+
 @Service
 @RequiredArgsConstructor
 public class PermissionService {

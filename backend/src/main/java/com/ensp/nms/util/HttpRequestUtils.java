@@ -3,8 +3,13 @@ package com.ensp.nms.util;
 import jakarta.servlet.http.HttpServletRequest;
 
 /**
- * 从 HTTP 请求解析客户端 IP（支持反向代理 X-Forwarded-For）。
- */
+ * 从HTTP请求解析客户端IP，支持反向代理X-Forwarded-For。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15 */
+
 public final class HttpRequestUtils {
 
     private HttpRequestUtils() {

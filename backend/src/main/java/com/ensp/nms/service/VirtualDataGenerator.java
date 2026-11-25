@@ -11,6 +11,15 @@ import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
 
+/**
+ * 仿真设备数据生成，补充端口与系统指标。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15
+ */
+
 @Slf4j
 @Component
 public class VirtualDataGenerator {

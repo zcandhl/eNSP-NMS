@@ -1,8 +1,13 @@
 /**
- * 用法：
- *   v-permission="'devices:write'"
- *   v-permission="['alarms:handle', 'alarms:write']"  // 任一即可
+ * @file    permission.js
+ * @module  自定义指令
+ * @desc    按钮级权限指令，按权限编码控制元素显隐。
+ *
+ * @author  ZC
+ * @date    2026-08-15 * @version 1.0.0
+ * @requires vue, @/stores/auth
  */
+
 import { watchEffect } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 

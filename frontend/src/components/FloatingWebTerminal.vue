@@ -1,3 +1,13 @@
+/**
+ * @file    FloatingWebTerminal.vue
+ * @module  通用组件
+ * @desc    悬浮 Web 终端入口组件。
+ *
+ * @author  ZC
+ * @date    2026-08-15 * @version 1.0.0
+ * @requires @element-plus/icons-vue, vue, @/api/device, @/components/XtermTerminal, @/composables/webTerminalBus, @/utils/deviceCapabilities
+ */
+
 <template>
   <Teleport to="body">
     <div
@@ -65,7 +75,7 @@
         <el-empty v-else description="请选择已配置 SSH 账号的设备" :image-size="64" />
       </div>
 
-      <!-- 八向缩放手柄（最大化时隐藏） -->
+      
       <template v-if="!maximized">
         <div
           v-for="dir in resizeDirs"
@@ -162,7 +172,7 @@ function saveGeom() {
       w: size.value.w,
       h: size.value.h
     }))
-  } catch { /* ignore */ }
+  } catch {  }
 }
 
 function loadGeom() {
@@ -490,7 +500,6 @@ onBeforeUnmount(() => {
   height: 100%;
 }
 
-/* 边缘 / 角落缩放热区 */
 .fwt-handle {
   position: absolute;
   z-index: 5;

@@ -36,8 +36,13 @@ import java.util.Objects;
 import java.util.Set;
 
 /**
- * AIOps 半闭环动作：备份/回滚需确认；连带/收敛噪音确认不改配。
- */
+ * AIOps半闭环动作：备份/回滚需确认，连带/收敛噪音确认不改配。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15 */
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -51,9 +56,6 @@ public class AiopsActionService {
     private final AlarmService alarmService;
     private final TopologyLinkRepository topologyLinkRepository;
 
-    /**
-     * 批量刷新离线设备连通性（真实 Ping/状态写回）。
-     */
     @Transactional
     public Map<String, Object> refreshOfflineDevices(boolean confirmed) {
         Map<String, Object> result = new LinkedHashMap<>();
@@ -102,9 +104,6 @@ public class AiopsActionService {
         return result;
     }
 
-    /**
-     * 批量确认噪音告警（不改配）。
-     */
     @Transactional
     public Map<String, Object> ackSecondaryWithConfirm(Long deviceId, boolean confirmed, String operatorOverride) {
         return ackSecondaryWithConfirm(deviceId, null, confirmed, operatorOverride);
@@ -209,15 +208,12 @@ public class AiopsActionService {
         return result;
     }
 
-    /**
-     * 是否纳入本次确认范围。
-     */
     private boolean isAckCandidate(Alarm a, Long alarmId, Long rootDeviceId,
                                    Set<Long> impactDeviceIds, Long deviceIdOnly) {
         if (a == null || a.getId() == null) {
             return false;
         }
-        // 不确认根因代表告警本身（除非它自己也是连带）
+        // 不确认根因代表告警本身
         if (alarmId != null && Objects.equals(a.getId(), alarmId) && !a.isSecondaryAlarm()) {
             return false;
         }
@@ -253,7 +249,6 @@ public class AiopsActionService {
         return isSecondary || isChild;
     }
 
-    /** 设备自身 + 一跳邻居 */
     private Set<Long> impactDevices(Long deviceId) {
         Set<Long> ids = new HashSet<>();
         if (deviceId == null) {
@@ -283,10 +278,6 @@ public class AiopsActionService {
         return s == null ? "" : s;
     }
 
-    /**
-     * 收敛事件标准处置（真实落库，不改配）：
-     * 1) 刷新设备 2) 确认关联噪音 3) 恢复则清除(CLEARED)，未恢复则确认进入处理中(ACK)。
-     */
     @Transactional
     public Map<String, Object> disposeIncidentWithConfirm(Long alarmId, Long deviceId, boolean confirmed) {
         Map<String, Object> result = new LinkedHashMap<>();
@@ -311,7 +302,7 @@ public class AiopsActionService {
             targetDeviceId = root.getDeviceId();
         }
 
-        // Step 1: refresh device（恢复在线时会自动清除连通性告警）
+        // Step 1: refresh device
         Map<String, Object> refreshStep = new LinkedHashMap<>();
         refreshStep.put("code", "refresh_device");
         refreshStep.put("title", "刷新设备连通性");
@@ -345,7 +336,7 @@ public class AiopsActionService {
         }
         steps.add(refreshStep);
 
-        // Step 2: ack noise（仅 ACTIVE 关联告警）
+        // Step 2: ack noise
         Map<String, Object> ackNoise = ackSecondaryWithConfirm(targetDeviceId, alarmId, true, null);
         Map<String, Object> noiseStep = new LinkedHashMap<>();
         noiseStep.put("code", "ack_noise");
@@ -357,7 +348,7 @@ public class AiopsActionService {
         noiseStep.put("message", ackNoise.getOrDefault("message", ""));
         steps.add(noiseStep);
 
-        // Step 3: 根告警 — 恢复则 CLEARED，未恢复则 ACK=处理中
+        // Step 3: 根告警 — 恢复则CLEARED，未恢复则ACK=处理中
         Map<String, Object> rootStep = new LinkedHashMap<>();
         rootStep.put("code", "resolve_root");
         rootStep.put("title", "闭环本事件代表告警");
@@ -496,7 +487,7 @@ public class AiopsActionService {
         String trap = nullToEmpty(root.getTrapType());
         String title = nullToEmpty(root.getTitle());
         String blob = (title + " " + nullToEmpty(root.getDescription()) + " " + trap).toLowerCase(Locale.ROOT);
-        // 仅整机离线可由探测在线判定恢复；linkDown/接口 down 不能因主机仍 ping 通就关闭
+        // 仅整机离线可由探测在线判定恢复；linkDown/接口down不能因主机仍ping通就关闭
         boolean deviceOffline = "DEVICE_OFFLINE".equalsIgnoreCase(trap)
                 || title.contains("设备离线")
                 || blob.contains("device offline")

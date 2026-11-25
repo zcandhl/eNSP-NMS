@@ -6,8 +6,13 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import java.util.Map;
 
 /**
- * 从当前登录上下文解析操作人展示名（优先 realName）。
- */
+ * 从当前登录上下文解析操作人展示名。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15 */
+
 public final class SecurityUtils {
 
     private SecurityUtils() {

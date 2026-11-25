@@ -11,6 +11,14 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * 智能运维概览、健康评分、根因分析、异常检测与无人值守接口。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15 */
+
 @RestController
 @RequestMapping("/api/aiops")
 @RequiredArgsConstructor
@@ -61,7 +69,6 @@ public class AiopsController {
         return aiopsService.runAnomalyDetect();
     }
 
-    /** 一键智能巡检：立即关联 + 基线，返回可读报告 */
     @PostMapping("/inspect")
     @PreAuthorize("hasAuthority('aiops:read') or hasAuthority('alarms:read')")
     public Map<String, Object> inspect() {
@@ -74,7 +81,6 @@ public class AiopsController {
         return aiopsService.screenBrief();
     }
 
-    /** 智能大屏数据看板：设备/告警/性能/处置全量真实指标 */
     @GetMapping("/dashboard")
     @PreAuthorize("hasAuthority('aiops:read') or hasAuthority('alarms:read')")
     public Map<String, Object> dashboard(@RequestParam(value = "force", required = false) Boolean force) {

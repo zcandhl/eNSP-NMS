@@ -9,8 +9,13 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * 按 snmpTrapOID 映射可读告警类型，并生成运维可读描述（Trap 接收与历史纠偏共用）。
- */
+ * 按snmpTrapOID映射可读告警类型，并生成运维可读描述。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15 */
+
 public final class TrapOidClassifier {
 
     private static final Pattern SNMP_TRAP_OID_LINE = Pattern.compile(
@@ -21,7 +26,6 @@ public final class TrapOidClassifier {
             "^\\s*([^=\\n]+?)\\s*=\\s*(.+?)\\s*$", Pattern.MULTILINE);
     private static final Pattern REPEAT_SUFFIX = Pattern.compile(
             "(?s)(\\n?\\[重复 \\d+ 次.*?\\]\\s*)$");
-    /** vrrpOperMasterIpAddr（VRRP-MIB 68.1.3.1.7）：Master 设备实际 IP，索引 ifIndex.VrId */
     private static final String VRRP_MASTER_IP_PREFIX = "1.3.6.1.2.1.68.1.3.1.7.";
 
     private TrapOidClassifier() {
@@ -95,21 +99,21 @@ public final class TrapOidClassifier {
             return new Classified("OSPF路由事件", "路由告警-OSPF", Alarm.Severity.WARNING);
         }
 
-        // VRRP：标准 VRRP-MIB（RFC 2787/3768，mib-2.68）+ 华为私有 hwVrrpExt 扩展
+        // VRRP：标准VRRP-MIB（RFC 2787/3768，mib-2.68）+ 华为私有hwVrrpExt扩展
         if (oidIs(oid, "1.3.6.1.2.1.68.0.1")) {
-            // vrrpTrapNewMaster：VRRP 状态切换为 Master（主备切换事件），华为文档级别 Warning
+            // vrrpTrapNewMaster：VRRP状态切换为Master，华为文档级别Warning
             return new Classified("VRRP主备切换告警", "路由告警-VRRP主备切换", Alarm.Severity.WARNING);
         }
         if (oidIs(oid, "1.3.6.1.2.1.68.0.2")) {
-            // vrrpTrapAuthFailure：收到与本端认证方式/认证字冲突的 VRRP 报文
+            // vrrpTrapAuthFailure：收到与本端认证方式/认证字冲突的VRRP报文
             return new Classified("VRRP报文认证冲突", "路由告警-VRRP认证失败", Alarm.Severity.WARNING);
         }
         if (oidIs(oid, "1.3.6.1.4.1.2011.5.25.127.2.30.1")) {
-            // hwVrrpExtTrapMasterDown：Master 设备失效（主备切换的故障侧原因）
+            // hwVrrpExtTrapMasterDown：Master设备失效
             return new Classified("VRRP主设备失效", "路由告警-VRRP主设备失效", Alarm.Severity.MAJOR);
         }
         if (oidIs(oid, "1.3.6.1.4.1.2011.5.25.127.2.30.2")) {
-            // hwVrrpExtTrapNonMaster：设备处于非 Master 状态
+            // hwVrrpExtTrapNonMaster：设备处于非Master状态
             return new Classified("VRRP非Master状态", "路由告警-VRRP非Master状态", Alarm.Severity.WARNING);
         }
         if (oid.contains("1.3.6.1.2.1.68.0.")
@@ -117,7 +121,7 @@ public final class TrapOidClassifier {
             return new Classified("VRRP状态事件", "路由告警-VRRP", Alarm.Severity.WARNING);
         }
 
-        // STP/MSTP：标准 BRIDGE-MIB dot1dTraps（mib-2.17）
+        // STP/MSTP：标准BRIDGE-MIB dot1dTraps（mib-2.17）
         if (oidIs(oid, "1.3.6.1.2.1.17.0.1")) {
             return new Classified("STP生成树新根事件", "交换告警-STP新根", Alarm.Severity.WARNING);
         }
@@ -125,7 +129,7 @@ public final class TrapOidClassifier {
             return new Classified("STP拓扑变更告警", "交换告警-STP拓扑变更", Alarm.Severity.WARNING);
         }
 
-        // WLAN：HUAWEI-WLAN-AP-MIB（AP）与 HUAWEI-WLAN-STA-MIB（终端）
+        // WLAN：HUAWEI-WLAN-AP-MIB（AP）与HUAWEI-WLAN-STA-MIB
         if (oidIs(oid, "1.3.6.1.4.1.2011.6.139.13.1.1.1")) {
             return new Classified("AP下线告警", "WLAN告警-AP下线", Alarm.Severity.MAJOR);
         }
@@ -153,7 +157,6 @@ public final class TrapOidClassifier {
         return "通用Trap告警".equals(t) || "通用告警".equals(t) || "设备告警".equals(t);
     }
 
-    /** 旧版分号堆砌 / 含错误「v3用户」等，需要重写描述 */
     public static boolean needsDescriptionRebuild(String description) {
         if (description == null || description.isBlank()) {
             return true;
@@ -180,9 +183,6 @@ public final class TrapOidClassifier {
         return m.find() ? m.group(1).trim() : null;
     }
 
-    /**
-     * 根据 rawData + 已分类结果生成运维可读描述（不含重复计数后缀）。
-     */
     public static String buildReadableDescription(String rawData, Classified classified,
                                                   String peerIp, String agentIp,
                                                   String managedIp, String deviceName) {
@@ -207,7 +207,7 @@ public final class TrapOidClassifier {
             sb.append("Trap OID: ").append(oid).append('\n');
         }
 
-        // OSPF 关键
+        // OSPF关键
         String ospfRid = firstVb(vb, "1.3.6.1.2.1.14.1.1.0", "1.3.6.1.2.1.14.1.1");
         String area = firstVbByPrefix(vb, "1.3.6.1.2.1.14.4.1.1.");
         String lsaType = firstVbByPrefix(vb, "1.3.6.1.2.1.14.4.1.2.");
@@ -232,7 +232,7 @@ public final class TrapOidClassifier {
             }
         }
 
-        // VRRP 关键：vrrpOperMasterIpAddr (1.3.6.1.2.1.68.1.3.1.7)，索引 = ifIndex.VrId
+        // VRRP关键：vrrpOperMasterIpAddr (1.3.6.1.2.1.68.1.3.1.7)，索引 = ifIndex.VrId
         String vrrpMasterIp = firstVbByPrefix(vb, VRRP_MASTER_IP_PREFIX);
         String vrrpIndex = vbIndexByPrefix(vb, VRRP_MASTER_IP_PREFIX);
         if (vrrpMasterIp != null || vrrpIndex != null || type.contains("VRRP")) {
@@ -431,7 +431,6 @@ public final class TrapOidClassifier {
         return null;
     }
 
-    /** 取 varbind OID 中 prefix 之后的索引段（如 .26.70 → "26.70"） */
     private static String vbIndexByPrefix(Map<String, String> vb, String prefix) {
         if (vb == null || prefix == null) {
             return null;
@@ -492,7 +491,7 @@ public final class TrapOidClassifier {
         if (timeticks == null) {
             return "-";
         }
-        // 已是 2:16:28.33 或 days 格式则直接用
+        // 已是2:16:28.33或days格式则直接用
         String t = timeticks.trim();
         if (t.contains(":") || t.toLowerCase(Locale.ROOT).contains("day")) {
             return t;

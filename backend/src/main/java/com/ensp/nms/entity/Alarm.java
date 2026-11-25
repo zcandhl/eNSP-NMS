@@ -4,6 +4,14 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
+/**
+ * 告警实体，记录设备告警内容、级别与处理状态。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15 */
+
 @Entity
 @Table(name = "alarm")
 public class Alarm {
@@ -32,7 +40,6 @@ public class Alarm {
     @JsonIgnore
     private Device device;
 
-    /** 只读映射，避免懒加载 device 导致 LazyInitializationException */
     @Column(name = "device_id", insertable = false, updatable = false)
     private Long deviceId;
 
@@ -71,14 +78,12 @@ public class Alarm {
     @Column(name = "acknowledged_by", length = 100)
     private String acknowledgedBy;
 
-    /** 确认备注（运维留痕） */
     @Column(name = "acknowledge_note", columnDefinition = "TEXT")
     private String acknowledgeNote;
 
     @Column(name = "cleared_at")
     private LocalDateTime clearedAt;
 
-    /** 关闭原因（网管探测确认 / 人工关闭等）；列缺失时由 ddl-auto=update 或 migration-probe-recovery.sql 补齐 */
     @Column(name = "clear_note", columnDefinition = "TEXT", nullable = true)
     private String clearNote;
 
@@ -88,32 +93,24 @@ public class Alarm {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
-    /** Trap 抑制窗口内重复次数（首次为 1） */
     @Column(name = "repeat_count")
     private Integer repeatCount = 1;
 
-    /** 最近一次重复发生时间 */
     @Column(name = "last_occurred_at")
     private LocalDateTime lastOccurredAt;
 
-    /** 风暴/关联父告警 ID（子告警指向代表告警） */
     @Column(name = "parent_alarm_id")
     private Long parentAlarmId;
 
-    /** STORM / LINK / SECONDARY / null */
     @Column(name = "correlation_type", length = 32)
     private String correlationType;
 
-    /** 拓扑连带：上游故障导致的下游告警 */
     @Column(name = "secondary_alarm")
     private Boolean secondaryAlarm = false;
 
     @Column(name = "correlation_note", length = 500)
     private String correlationNote;
 
-    /**
-     * 非持久化：当前 trapType 是否属于「确认即办结」白名单（由 AlarmService 填充）。
-     */
     @Transient
     private Boolean ackCloses;
 
@@ -162,7 +159,7 @@ public class Alarm {
         }
     }
 
-    // 优先用列映射，避免会话外访问懒加载 device
+    // 优先用列映射，避免会话外访问懒加载device
     public Long getDeviceId() {
         if (deviceId != null) {
             return deviceId;
@@ -174,7 +171,6 @@ public class Alarm {
         this.deviceId = deviceId;
     }
 
-    /** 纳管设备名称（JSON） */
     public String getDeviceName() {
         return device != null ? device.getName() : null;
     }

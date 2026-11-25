@@ -35,12 +35,19 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
+/**
+ * 配置备份检索、实时拉取、只读回显与批量配置操作。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15 */
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class DeviceConfigService {
 
-    /** 超过该天数未备份视为过期 */
     public static final int STALE_BACKUP_DAYS = 7;
 
     private final DeviceConfigRepository deviceConfigRepository;
@@ -50,10 +57,6 @@ public class DeviceConfigService {
     private final ConfigChangeLogService configChangeLogService;
     private final AuditLogService auditLogService;
 
-    /**
-     * 连接类失败的重试次数。AC6005 这类设备在 eNSP 里会间歇性重启/卡顿，
-     * 单次失败不代表设备真的不可用；重试能把「抖动」挡在用户感知之外。
-     */
     @Value("${nms.ssh.config-retry-attempts:3}")
     private int configRetryAttempts = 3;
 
@@ -75,7 +78,6 @@ public class DeviceConfigService {
         return deviceConfigRepository.findById(id);
     }
 
-    /** 配置健康总览：仅聚合元数据，不加载备份全文 */
     public ConfigHealthOverview getBackupHealthOverview() {
         List<Device> devices = deviceRepository.findAll();
 
@@ -166,7 +168,6 @@ public class DeviceConfigService {
         return overview;
     }
 
-    /** 拉取设备当前运行/启动配置（不入库，用于对比） */
     public String pullLiveConfig(Long deviceId, String configType) throws Exception {
         Device device = deviceRepository.findById(deviceId)
                 .orElseThrow(() -> new RuntimeException("Device not found"));
@@ -177,11 +178,6 @@ public class DeviceConfigService {
                 startup, protocolOf(device));
     }
 
-    /**
-     * 受控只读 show：白名单命令，禁止进入 system-view / 改配。
-     * 走 executeDisplayCommand 只读查询专用通道（自动关分页、截去回显噪声），
-     * 不经过配置命令过滤器（该过滤器会误删 display 行，曾导致巡检"成功: 0, 失败: 0"）。
-     */
     public String runReadOnlyShow(Long deviceId, String command) throws Exception {
         String cmd = normalizeShowCommand(command);
         Device device = deviceRepository.findById(deviceId)
@@ -192,7 +188,6 @@ public class DeviceConfigService {
                 cmd, protocolOf(device));
     }
 
-    /** 统一校验远程管理账号，报错里带上设备名与当前协议，便于现场定位 */
     private void requireCredentials(Device device) {
         if (device.getSshUsername() == null || device.getSshUsername().isBlank()
                 || device.getSshPassword() == null || device.getSshPassword().isBlank()) {
@@ -201,13 +196,11 @@ public class DeviceConfigService {
         }
     }
 
-    /** 设备当前使用的远程管理协议：ssh（默认）/ telnet */
     public static String protocolOf(Device device) {
         return device != null && device.isTelnetManagement()
                 ? SshClient.PROTOCOL_TELNET : SshClient.PROTOCOL_SSH;
     }
 
-    /** 管理端口：优先用设备上配的端口，未配则按协议取默认值（SSH 22 / Telnet 23） */
     public static int managementPort(Device device) {
         Integer configured = device != null ? device.getSshPort() : null;
         if (configured != null && configured > 0) {
@@ -275,14 +268,13 @@ public class DeviceConfigService {
         Device device = deviceRepository.findById(deviceId)
                 .orElseThrow(() -> new RuntimeException("Device not found"));
 
-        // AC6005 在 eNSP 中 SSH 服务异常（KEXINIT 后无响应），该类设备已切换为 telnet 管理，
-        // 因此不再对 AC 做特殊跳过处理，交由 managementProtocol 决定通道。
+        // AC类设备SSH服务异常，已切换为telnet管理
+        // 因此不再对AC做特殊跳过处理，交由managementProtocol决定通道。
         requireCredentials(device);
 
         boolean isStartup = "startup".equalsIgnoreCase(configType);
-        // AC6005（telnet 管理）镜像不响应 display saved-configuration（实测回显命令后直接回到
-        // 提示符），配置文件 sdcard:/vrpcfg.zip 又是 zip 二进制无法直接读取。对这类设备，
-        // startup 备份自动以 running 配置代替，并在描述里如实标注，避免演示时报错。
+        // AC6005镜像不响应display saved-configuration，配置文件sdcard:/vrpcfg.zip又是zip二进制无法直接读取。对这类设备
+        // startup备份自动以running配置代替，并在描述里如实标注。
         boolean startupDowngradedToRunning = false;
         if (isStartup && device.isTelnetManagement()) {
             isStartup = false;
@@ -328,11 +320,6 @@ public class DeviceConfigService {
         return saved;
     }
 
-    /**
-     * 取配置，带连接类重试。
-     * <p>只重试「握手超时 / 读不到内容 / 连接被重置」这类瞬时故障；认证失败、端口不通
-     * 属于确定性问题，立即抛出，避免把明确错误拖成几十秒等待。</p>
-     */
     private String fetchConfigWithRetry(Device device, boolean startup) {
         int attempts = Math.max(1, configRetryAttempts);
         SshConnectException last = null;
@@ -359,11 +346,10 @@ public class DeviceConfigService {
         throw new RuntimeException("设备【" + device.getName() + "】" + reason, last);
     }
 
-    /** 瞬时故障才值得重试；认证失败、端口不通重试也没用 */
     private boolean isTransient(SshConnectException e) {
         String m = e.getMessage() == null ? "" : e.getMessage();
-        // 「Read timed out」「timed out」是 socket 读超时的英文原文（SocketTimeoutException），
-        // AC6005 telnet 会话建立阶段会随机出现，必须纳入重试范围
+        // 「Read timed out」「timed out」是socket读超时的英文原文（SocketTimeoutException）
+        // AC6005 telnet会话建立阶段会随机出现，必须纳入重试范围
         return m.contains("协商超时") || m.contains("读取配置失败") || m.contains("连接被设备重置")
                 || m.toLowerCase().contains("timed out") || m.contains("超时");
     }
@@ -376,7 +362,6 @@ public class DeviceConfigService {
         }
     }
 
-    /** 每设备最多保留份数，超出删除最旧备份 */
     public static final int MAX_BACKUPS_PER_DEVICE = 30;
 
     @Transactional
@@ -407,7 +392,6 @@ public class DeviceConfigService {
         deviceConfigRepository.deleteById(id);
     }
 
-    /** 批量删除备份（可选校验均属同一设备） */
     @Transactional
     public Map<String, Object> batchDeleteConfigs(List<Long> ids, Long expectedDeviceId) {
         List<Long> idList = ids != null ? ids : List.of();
@@ -439,7 +423,6 @@ public class DeviceConfigService {
         return out;
     }
 
-    /** 批量导出为 ZIP（UTF-8） */
     public byte[] exportConfigsAsZip(List<Long> ids) throws Exception {
         List<Long> idList = ids != null ? ids.stream().filter(Objects::nonNull).distinct().toList() : List.of();
         if (idList.isEmpty()) {
@@ -501,9 +484,6 @@ public class DeviceConfigService {
         return restoreConfig(deviceId, configId, progress, false, false);
     }
 
-    /**
-     * @param preBackup 恢复前先备份当前 running，写入变更记录
-     */
     public Map<String, Object> restoreConfig(Long deviceId, Long configId,
                                              java.util.function.BiConsumer<Integer, Integer> progress,
                                              boolean preBackup) throws Exception {
@@ -569,7 +549,7 @@ public class DeviceConfigService {
         response.put("successCount", batch.successCount());
         response.put("failCount", batch.failCount());
         response.put("sourceConfigType", config.getConfigType());
-        // 华为侧：将备份内容写入运行配置，文末 save 会同步写入启动配置
+        // 华为侧：将备份内容写入运行配置，文末save会同步写入启动配置
         response.put("applyMode", "running_then_save");
         response.put("note", "startup".equalsIgnoreCase(config.getConfigType())
                 ? "启动配置备份已下发到运行配置，并已执行 save 写入启动配置"
@@ -581,9 +561,6 @@ public class DeviceConfigService {
         return response;
     }
 
-    /**
-     * 批量备份多台设备（串行 SSH），供异步任务调用。
-     */
     public Map<String, Object> batchBackup(List<Long> deviceIds, String configType, String description,
                                            String operator,
                                            java.util.function.BiConsumer<Integer, Integer> progress) {
@@ -762,10 +739,6 @@ public class DeviceConfigService {
         return processDeviceConfig(deviceId, templateContent, enableVariables, index, operator, reason, null, null);
     }
 
-    /**
-     * @param extraVars    变量集自定义变量（可 null）；非 null 时无论 enableVariables 均执行变量替换
-     * @param segmentIndex 变量集段号（1 起），仅用于结果行标注，可 null
-     */
     private Map<String, Object> processDeviceConfig(Long deviceId, String templateContent,
                                                     boolean enableVariables, int index, String operator,
                                                     String reason, Map<String, String> extraVars,
@@ -827,9 +800,6 @@ public class DeviceConfigService {
         return deviceResult;
     }
 
-    /**
-     * 下发前预检：解析变量后的命令行 vs 当前 running，估算新增行数（不真正下发）。
-     */
     public Map<String, Object> previewBatchApply(List<Long> deviceIds, String templateContent,
                                                  boolean enableVariables) {
         Map<String, Object> out = new LinkedHashMap<>();
@@ -920,11 +890,6 @@ public class DeviceConfigService {
         return out;
     }
 
-    /**
-     * 变量集批量下发：每组变量渲染出一段独立配置（支持 ${room} 等自定义占位符），
-     * 段 × 设备 逐对下发——同一台设备可接收多段不同配置（如 13 个机房段 → 2 台核心）。
-     * 复用 processDeviceConfig：分波/审计/变更记录全部继承。
-     */
     public Map<String, Object> batchApplyVariableSets(List<Long> deviceIds, String templateContent,
                                                       List<Map<String, String>> variableSets, boolean parallel,
                                                       java.util.function.BiConsumer<Integer, Integer> deviceProgress,
@@ -979,10 +944,6 @@ public class DeviceConfigService {
         return results;
     }
 
-    /**
-     * 变量集下发预检（轻量）：只做本地渲染，不拉设备 running、不建 SSH 连接。
-     * 每段返回变量表、命令行数、渲染预览与未替换占位符计数。
-     */
     public Map<String, Object> previewBatchVariableSets(List<Long> deviceIds, String templateContent,
                                                         List<Map<String, String>> variableSets) {
         Map<String, Object> out = new LinkedHashMap<>();
@@ -1036,7 +997,6 @@ public class DeviceConfigService {
                 .replace("${index}", String.valueOf(index));
     }
 
-    /** 在内置变量基础上追加变量集自定义变量（${room} 等），值为 null 时替换为空串 */
     private String replaceVariables(String content, Device device, int index, Map<String, String> extraVars) {
         String out = replaceVariables(content, device, index);
         if (extraVars != null) {

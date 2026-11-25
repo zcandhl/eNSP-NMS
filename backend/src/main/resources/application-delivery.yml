@@ -1,4 +1,4 @@
-# 学校正式交付 profile：Compose / 安装脚本默认使用
+# 学校正式交付profile：Compose / 安装脚本默认使用
 # 启动：SPRING_PROFILES_ACTIVE=delivery
 server:
   port: ${SERVER_PORT:8080}
@@ -27,7 +27,7 @@ auth:
     secret: ${AUTH_JWT_SECRET}
     expiration-ms: ${AUTH_JWT_EXPIRATION_MS:86400000}
   cors:
-    # 经 Nginx 同源访问时浏览器不跨域；保留本机与常见访问入口
+    # 经Nginx同源访问时浏览器不跨域；保留本机与常见访问入口
     allowed-origins: ${AUTH_CORS_ORIGINS:http://localhost,http://127.0.0.1}
 
 logging:
@@ -37,5 +37,5 @@ logging:
 
 snmp:
   trap:
-    # 容器内非特权端口；Compose 映射主机 162 -> 容器 1162
+    # 容器内非特权端口；Compose映射主机162 -> 容器1162
     port: ${SNMP_TRAP_PORT:1162}

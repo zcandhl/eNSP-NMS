@@ -60,6 +60,16 @@
             </button>
           </div>
 
+/**
+ * @file    TopologyView.vue
+ * @module  视图页/拓扑
+ * @desc    网络拓扑可视化与链路管理页。
+ *
+ * @author  ZC
+ * @date    2026-08-15 * @version 1.0.0
+ * @requires @antv/g6, @element-plus/icons-vue, element-plus, vue, vue-router, @/api/device, @/api/topology, @/components/ops-assistant/OpsAssistantPanel, @/composables/askOpsAssistant, @/composables/pageOpsBus, @/composables/useThemeColors, @/composables/webTerminalBus, @/stores/auth, @/stores/project, @/utils/deviceCapabilities, @/utils/topologyHelpers
+ */
+
           <template v-if="isEditMode && auth.hasPermission('topology:write')">
             <span class="topo-vsep" />
             <div class="topo-layout-btns">
@@ -427,7 +437,7 @@
       </div>
     </div>
 
-    <!-- 设备运维枢纽抽屉 -->
+    
     <el-drawer
       v-model="deviceDrawerVisible"
       :title="selectedDevice ? `运维枢纽 · ${selectedDevice.name}` : '运维枢纽'"
@@ -467,7 +477,7 @@
         </div>
 
         <el-tabs v-model="hubTab" class="hub-tabs" @tab-change="onHubTabChange">
-          <!-- 监视 -->
+          
           <el-tab-pane
             v-if="auth.hasPermission('performance:read') && deviceCaps(selectedDevice).performance"
             label="监视"
@@ -528,7 +538,7 @@
             </div>
           </el-tab-pane>
 
-          <!-- 诊断 -->
+          
           <el-tab-pane v-if="auth.hasPermission('devices:read')" label="诊断" name="diagnose">
             <div class="hub-pane">
               <div class="hub-pane-actions">
@@ -600,7 +610,7 @@
             </div>
           </el-tab-pane>
 
-          <!-- 告警 -->
+          
           <el-tab-pane v-if="auth.hasPermission('alarms:read')" label="告警" name="alarms">
             <div class="hub-pane">
               <div class="hub-pane-actions">
@@ -648,7 +658,7 @@
             </div>
           </el-tab-pane>
 
-          <!-- 变更：仅拓扑写 / 配置写可见 -->
+          
           <el-tab-pane v-if="canOpenChangeTab" label="变更" name="change">
             <div class="hub-pane">
               <template v-if="auth.hasPermission('topology:write') && deviceCaps(selectedDevice).topologyDiscover">
@@ -970,7 +980,7 @@
       </template>
     </el-dialog>
 
-    <!-- 拓扑发现对话框 -->
+    
     <el-dialog
       v-model="discoverDialogVisible"
       title="扫描拓扑链路"
@@ -1017,7 +1027,7 @@
       </template>
     </el-dialog>
 
-    <!-- 发现结果说明 -->
+    
     <el-dialog v-model="discoverResultVisible" title="拓扑发现结果" width="720px">
       <template v-if="discoverResult">
         <el-alert
@@ -1085,7 +1095,7 @@
       </template>
     </el-dialog>
 
-    <!-- 右键运维菜单 -->
+    
     <teleport to="body">
       <div
         v-show="ctxMenu.visible"
@@ -1215,7 +1225,7 @@ const searchText = ref('')
 const zoomLevel = ref(1)
 const currentLayout = ref('force')
 
-// 监视 / 编辑：默认监视（刷新查看）；编辑才可拖节点、布局、发现、改链路
+// 监视 / 编辑：默认监视；编辑才可拖节点、布局、发现、改链路
 const VIEW_MODE_KEY = 'topology-view-mode'
 const viewMode = ref(localStorage.getItem(VIEW_MODE_KEY) === 'edit' ? 'edit' : 'monitor')
 const auth = useAuthStore()
@@ -1236,7 +1246,7 @@ const resolveHubTab = (tab) => {
     return auth.hasPermission('alarms:read') ? 'alarms' : 'diagnose'
   }
   if (t === 'terminal') {
-    // 终端已迁至导航栏浮窗，不再作为抽屉 Tab
+    // 终端已迁至导航栏浮窗，不再作为抽屉Tab
     return auth.hasPermission('devices:read') ? 'diagnose' : (auth.hasPermission('alarms:read') ? 'alarms' : 'monitor')
   }
   if (t === 'alarms' && !auth.hasPermission('alarms:read')) return 'diagnose'
@@ -1270,14 +1280,13 @@ const setViewMode = (mode) => {
   onViewModeChange(mode)
 }
 
-// --- 自动刷新 ---
 const autoRefreshEnabled = ref(false)
 const autoRefreshInterval = ref(30)            // 秒：15 / 30 / 60 / 300
 const nextRefreshIn = ref(30)                  // 倒计时显示
 let topologyTimerId = null                      // 主拓扑轮询定时器
-let countdownTimerId = null                     // 1s 倒计时定时器
+let countdownTimerId = null                     // 1s倒计时定时器
 let lastAutoRefreshErrorAt = 0                  // 避免连续报错刷屏
-/** 前端定时扫描链路（与后端 nms.topology.auto-discover 互补） */
+
 const AUTO_DISCOVER_LS_KEY = 'topo-auto-discover-enabled'
 const AUTO_DISCOVER_ONCE_KEY = 'topo-auto-scan-once-at'
 const autoDiscoverEnabled = ref(localStorage.getItem(AUTO_DISCOVER_LS_KEY) === '1')
@@ -1482,7 +1491,7 @@ const getNodeColor = (device, alertCount = 0, alertSevere = false) => {
 const isActiveAlert = (alert) => {
   if (!alert) return false
   const s = String(alert.status || 'ACTIVE').toUpperCase()
-  // 拓扑上展示未关闭告警（待处理 + 处理中）
+  // 拓扑上展示未关闭告警
   return s === 'ACTIVE' || s === 'ACKNOWLEDGED' || s === ''
 }
 
@@ -1491,7 +1500,6 @@ const isSevereSeverity = (severity) => {
   return s === 'CRITICAL' || s === 'MAJOR'
 }
 
-/** 统一 IP 格式，便于告警 deviceIp 与设备 ipAddress 匹配 */
 const normalizeIp = (ip) => {
   if (!ip) return ''
   let s = String(ip).trim()
@@ -1506,7 +1514,6 @@ const normalizeIp = (ip) => {
   return s.trim()
 }
 
-/** 把告警解析到设备 id（优先 deviceId，其次规范化 IP） */
 const resolveAlarmDeviceId = (alert, ipToDeviceIdMap) => {
   if (!alert) return null
   if (alert.deviceId != null && alert.deviceId !== '') {
@@ -1525,7 +1532,7 @@ const resolveAlarmDeviceId = (alert, ipToDeviceIdMap) => {
 const initGraph = () => {
   if (!graphContainer.value) return
   
-  // 注册自定义节点（全局只注册一次，避免重复注册警告）
+  // 注册自定义节点
   if (!G6.__enspDeviceNodeRegistered) {
   G6.registerNode('device-node', {
     draw(cfg, group) {
@@ -1536,7 +1543,7 @@ const initGraph = () => {
       const iconSize = 36
       const iconOffset = -iconSize / 2
       
-      // 外层圆形（keyShape）；子图形 capture:false，避免挡住拖拽
+      // 外层圆形（keyShape）；子图形capture:false，避免挡住拖拽
       const circle = group.addShape('circle', {
         attrs: {
           x: 0,
@@ -1588,7 +1595,7 @@ const initGraph = () => {
         capture: false
       })
       
-      // 告警角标（始终创建，便于静默刷新显隐）
+      // 告警角标
       const alertVisible = (cfg.alertCount || 0) > 0
       const alertFill = cfg.alertSevere ? '#f56c6c' : '#e6a23c'
       group.addShape('circle', {
@@ -1815,7 +1822,7 @@ const initGraph = () => {
         'zoom-canvas',
         'click-select'
       ],
-      // G6 初始模式名；随后立即切到 viewMode
+      // G6初始模式名；随后立即切到viewMode
       default: ['drag-canvas', 'zoom-canvas', 'click-select']
     },
     defaultNode: {
@@ -1854,7 +1861,7 @@ const initGraph = () => {
       nodeSize: 72,
       collideStrength: 0.9,
       animate: false,
-      // 关键：changeData / 刷新时不要自动重跑布局（否则自动刷新会排成两排）
+      // 关键：changeData / 刷新时不要自动重跑布局
       relayoutAtChangeData: false
     },
     nodeStateStyles: {
@@ -1913,7 +1920,7 @@ const bindEvents = () => {
 
     graph.setItemState(item, 'hover', true)
 
-    // G6 4.x：邻居用 getNeighbors(id)，关联边用 node.getEdges()
+    // G6 4.x：邻居用getNeighbors(id)，关联边用node.getEdges()
     let neighbors = []
     try {
       neighbors = graph.getNeighbors(nodeId) || []
@@ -1979,11 +1986,11 @@ const bindEvents = () => {
     const model = item.getModel()
     const linkData = model.link
 
-    // 如果边 model 中没有 link，从 links 中查找匹配的链路
+    // 如果边model中没有link，从links中查找匹配的链路
     if (linkData && linkData.id !== undefined) {
       selectedLink.value = linkData
     } else {
-      // 通过 source/target 来匹配
+      // 通过source/target来匹配
       const source = model.source || (e.item && e.item.getModel && e.item.getModel().source)
       const target = model.target || (e.item && e.item.getModel && e.item.getModel().target)
       const foundLink = links.value.find(
@@ -2064,7 +2071,7 @@ const bindEvents = () => {
     }
   })
 
-  // 拖拽时固定节点，防止力导向把节点拉回（仅编辑模式）
+  // 拖拽时固定节点，防止力导向把节点拉回
   graph.on('node:dragstart', (e) => {
     if (!isEditMode.value) return
     const item = e.item
@@ -2086,7 +2093,7 @@ const bindEvents = () => {
     model.fy = model.y
   })
 
-  // 拖拽结束：保持固定，写入 localStorage + 后端
+  // 拖拽结束：保持固定，写入localStorage + 后端
   graph.on('node:dragend', (e) => {
     if (!isEditMode.value) return
     const item = e.item
@@ -2108,7 +2115,7 @@ const bindEvents = () => {
     if (!model || !model.device) return
     const clientX = (evt && evt.clientX) || 0
     const clientY = (evt && evt.clientY) || 0
-      // 防右键菜单被紧随其后的 click 立刻关掉
+      // 防右键菜单被紧随其后的click立刻关掉
       setTimeout(() => openCtxMenu(model.device, clientX, clientY), 0)
   })
   
@@ -2126,7 +2133,6 @@ const loadTopology = async (silent = false) => {
       topologyLoading.value = true
       topologyLoadError.value = ''
     }
-    // ===== 1. 获取原始数据（按当前工程裁剪：节点=本工程设备，链路=两端同属本工程）=====
     const topologyRes = await topologyApi.getFullTopology(projectStore.projectId)
 
     let nodes = []
@@ -2140,10 +2146,9 @@ const loadTopology = async (silent = false) => {
       linkList = topologyRes.links
     }
 
-    // 工程裁剪在后端完成（项目上下文只认一个工程），前端不再二次过滤，
-    // 以免链路字段名与节点 id 口径不一致导致"节点还在、连线全丢"。
+    // 工程裁剪在后端完成，前端不再二次过滤
+    // 以免链路字段名与节点id口径不一致导致"节点还在、连线全丢"。
 
-    // ===== 2. 规范化设备和链路 =====
     const nodeList = nodes.map(n => ({
       id: n.id,
       name: n.name || n.deviceName || 'Unknown',
@@ -2159,7 +2164,6 @@ const loadTopology = async (silent = false) => {
     devices.value = applyAlertSummaryToDevices(nodeList, topologyRes?.alertSummary)
     links.value = linkList.map(normalizeLink)
 
-    // ===== 3. 告警：静默刷新不覆盖真实告警列表（角标以节点 alertCount 为准）=====
     if (!silent) {
       try {
         const alarmsRes = await alarmApi.queryAlarms({
@@ -2191,7 +2195,6 @@ const loadTopology = async (silent = false) => {
       }
     }
 
-    // ===== 4. G6 渲染 =====
     const existingSelected = selectedDevice.value
     const existingDrawerOpen = deviceDrawerVisible.value
     const existingDrawerDeviceId = existingSelected ? existingSelected.id : null
@@ -2211,7 +2214,6 @@ const loadTopology = async (silent = false) => {
       }
     }
 
-    // ===== 5. 恢复选中的设备 / 链路 / 抽屉状态 =====
     if (existingDrawerOpen && existingDrawerDeviceId) {
       const stillExists = devices.value.some(d => String(d.id) === String(existingDrawerDeviceId))
       if (stillExists) {
@@ -2255,7 +2257,6 @@ const loadTopology = async (silent = false) => {
 const retryLoadTopology = () => loadTopology(false)
 const goToDevices = () => router.push('/devices')
 
-// ===== 解析节点坐标：优先画布当前坐标，然后后端，最后 localStorage =====
 const resolveNodePosition = (deviceId, device) => {
   if (graph) {
     try {
@@ -2291,9 +2292,8 @@ const resolveNodePosition = (deviceId, device) => {
   return { x: undefined, y: undefined, fixed: false }
 }
 
-// ===== 内部工具：根据当前 devices / links / alerts 构建 G6 nodes + edges =====
 const buildGraphData = () => {
-  // 创建设备 IP 到 ID 的映射（用于告警匹配）
+  // 创建设备IP到ID的映射
   const ipToDeviceIdMap = {}
   devices.value.forEach(device => {
     const nip = normalizeIp(device.ipAddress)
@@ -2302,7 +2302,7 @@ const buildGraphData = () => {
     }
   })
 
-  // 1. 告警映射：优先使用节点上的 alertCount/alertSevere
+  // 1. 告警映射：优先使用节点上的alertCount/alertSevere
   const alertMap = {}
   const severeMap = {}
   devices.value.forEach(device => {
@@ -2325,7 +2325,7 @@ const buildGraphData = () => {
     })
   }
 
-  // 2. 节点（应用画布筛选）
+  // 2. 节点
   const sourceDevices = visibleDevices.value
   const nodes = sourceDevices.map(device => {
     const count = alertMap[String(device.id)] || device.alertCount || 0
@@ -2350,7 +2350,7 @@ const buildGraphData = () => {
     return node
   })
 
-  // 3. 边（并行边 + 端口健康 / 利用率着色）
+  // 3. 边
   const nodeIds = new Set(sourceDevices.map(d => String(d.id)))
   const pairCount = {}
   const edgePairs = []
@@ -2443,7 +2443,6 @@ const buildGraphData = () => {
   return { nodes, edges }
 }
 
-/** 仅更新节点外观，绝不改动坐标 / 布局 */
 const patchNodeAppearance = (item, newNode) => {
   if (!item || !newNode) return
   try {
@@ -2511,7 +2510,6 @@ const patchNodeAppearance = (item, newNode) => {
   }
 }
 
-// ===== 全量刷新（首次加载/手动切换布局后）——尽量保留坐标 =====
 const isFirstLoad = ref(true)
 const updateGraphData = () => {
   if (!graph) return
@@ -2519,7 +2517,7 @@ const updateGraphData = () => {
     const { nodes, edges } = buildGraphData()
     const needLayout = nodes.some(n => n.fx == null || n.fy == null)
 
-    // changeData 默认不重布局（relayoutAtChangeData: false）
+    // changeData默认不重布局（relayoutAtChangeData: false）
     graph.changeData({ nodes, edges })
 
     if (needLayout) {
@@ -2542,7 +2540,7 @@ const updateGraphData = () => {
 
     if (isFirstLoad.value) {
       isFirstLoad.value = false
-      // 初始比例 100%，居中显示（不用 fitView 缩小）
+      // 初始比例100%，居中显示
       applyZoom100()
     }
   } catch (e) {
@@ -2550,7 +2548,6 @@ const updateGraphData = () => {
   }
 }
 
-// ===== 静默刷新（自动刷新）——只改状态样式，绝对不重跑布局 =====
 const updateGraphDataSilent = () => {
   if (!graph) return
   try {
@@ -2565,7 +2562,7 @@ const updateGraphDataSilent = () => {
     const newNodeIds = new Set(newNodes.map(n => String(n.id)))
     const newEdgeIds = new Set(newEdges.map(e => String(e.id)))
 
-    // 1) 更新已有节点外观（坐标不变）
+    // 1) 更新已有节点外观
     graph.getNodes().forEach(item => {
       const id = String(item.getID())
       if (nodeMap[id]) {
@@ -2591,7 +2588,7 @@ const updateGraphDataSilent = () => {
       } catch (ex) {}
     })
 
-    // 3) 删除已不存在的节点/边（不触发布局）
+    // 3) 删除已不存在的节点/边
     ;[...existingEdgeIds].forEach(id => {
       if (!newEdgeIds.has(id)) {
         try { graph.removeItem(id) } catch (e) {}
@@ -2641,7 +2638,7 @@ const updateGraphDataSilent = () => {
     })
   } catch (e) {
     console.error('G6 静默刷新失败:', e)
-    // 失败时也不要 graph.read 重排，避免布局跳动
+    // 失败时也不要graph.read重排，避免布局跳动
   }
 }
 
@@ -2712,7 +2709,6 @@ const runDiscoverScan = async (opts = {}) => {
   }
 }
 
-/** 无链路时自动扫描一次（30 分钟冷却） */
 const maybeAutoScanWhenEmpty = () => {
   if (autoDiscoverOnceTried) return
   if (!auth.hasPermission('topology:write')) return
@@ -2743,7 +2739,7 @@ const stopAutoDiscoverTimer = () => {
 
 const startAutoDiscoverTimer = () => {
   stopAutoDiscoverTimer()
-  // 前端每 5 分钟扫一次，避免与状态刷新 15s 冲突过频
+  // 前端每5分钟扫一次，避免与状态刷新15s冲突过频
   autoDiscoverTimerId = setInterval(() => {
     if (document.hidden) return
     if (discovering.value) return
@@ -2818,7 +2814,6 @@ const startDiscover = async () => {
   })
 }
 
-/** 批量拉取链路相关设备的端口指标，用于边着色 */
 const loadLinkTelemetry = async () => {
   if (!auth.hasPermission('performance:read')) return
   const ids = new Set()
@@ -2956,7 +2951,6 @@ const handleRefresh = async () => {
   }
 }
 
-// === 自动刷新控制 ===
 const startTopologyTimer = () => {
   stopTopologyTimer()
   nextRefreshIn.value = autoRefreshInterval.value
@@ -3011,7 +3005,6 @@ const handleIntervalChange = (val) => {
   }
 }
 
-// === 设备性能数据加速轮询（抽屉打开时） ===
 const startDeviceMonitorTimer = (deviceId) => {
   stopDeviceMonitorTimer()
   if (!deviceId || hubTab.value !== 'monitor') return
@@ -3059,7 +3052,6 @@ const fitView = () => {
   zoomLevel.value = graph.getZoom()
 }
 
-/** 固定 100% 缩放并尽量居中 */
 const applyZoom100 = () => {
   if (!graph) return
   try {
@@ -3107,13 +3099,12 @@ const runSearch = () => {
   if (firstMatch) graph.focusItem(firstMatch)
 }
 
-// 搜索设备并定位（防抖）
+// 搜索设备并定位
 const handleSearch = () => {
   clearTimeout(searchDebounceTimer)
   searchDebounceTimer = setTimeout(runSearch, 300)
 }
 
-/** 持久化节点坐标：localStorage + 后端（失败不影响前端） */
 const persistNodePosition = (deviceId, x, y) => {
   if (deviceId == null || typeof x !== 'number' || typeof y !== 'number') return
   const px = Math.round(x)
@@ -3237,7 +3228,7 @@ const resetHubDataState = () => {
 const loadDeviceAlarms = async (deviceId) => {
   deviceAlarmsLoading.value = true
   try {
-    // 与告警管理默认筛选一致：ACTIVE + ACKNOWLEDGED；deviceId 过滤口径由后端统一
+    // 与告警管理默认筛选一致：ACTIVE + ACKNOWLEDGED；deviceId过滤口径由后端统一
     const alarmRes = await alarmApi.queryAlarms({
       deviceId,
       status: ['ACTIVE', 'ACKNOWLEDGED'],
@@ -3285,7 +3276,7 @@ const loadMonitorData = async (deviceId) => {
 const loadHubTabData = async (tab, deviceId, force = false) => {
   if (!deviceId) return
   const key = `${deviceId}:${tab}`
-  // 告警每次进入都刷新；其它 Tab 仍走缓存，除非 force
+  // 告警每次进入都刷新；其它Tab仍走缓存，除非force
   const mustReload = force || tab === 'alarms'
   if (!mustReload && hubTabsLoaded.value.has(key)) return
 
@@ -3452,7 +3443,6 @@ const restoreNodeOpacity = (node) => {
   } catch (e) {}
 }
 
-/** 高亮选中设备及其一跳邻居 */
 const highlightDeviceNeighbors = (deviceId) => {
   if (!graph || deviceId == null) return
   clearGraphHighlight()
@@ -3584,7 +3574,6 @@ const askExplainPath = () => {
   })
 }
 
-/** 从告警页等入口：?deviceId=&tab=alarms */
 const applyRouteDeviceFocus = () => {
   const deviceId = route.query.deviceId
   if (deviceId == null || deviceId === '') return
@@ -3604,7 +3593,6 @@ const applyRouteDeviceFocus = () => {
   } catch (e) {}
 }
 
-/** 智能运维 RCA：?rca=1&highlight=1,2,3 */
 const applyRcaHighlightFromRoute = () => {
   if (route.query.rca !== '1' && !route.query.highlight) return
   if (!graph) return
@@ -3646,12 +3634,12 @@ const onHubTabChange = (name) => {
   }
 }
 
-// 选择设备（侧栏列表点击）
+// 选择设备
 const selectDevice = (device) => {
   openDeviceHub(device, 'monitor')
 }
 
-// 布局切换 —— 唯一会主动重排的入口（仅编辑模式）
+// 布局切换 —— 唯一会主动重排的入口
 const changeLayout = (type) => {
   if (!graph) return
   if (!isEditMode.value) {
@@ -3924,7 +3912,7 @@ const loadDevicePorts = async (deviceId, type) => {
 
   try {
     setLoading(true)
-    // 从性能监控接口获取真实设备端口（SNMP 采集或虚拟数据）
+    // 从性能监控接口获取真实设备端口
     const res = await performanceApi.getLatestPortMetrics(deviceId)
 
     // 处理各种响应格式
@@ -3937,13 +3925,13 @@ const loadDevicePorts = async (deviceId, type) => {
       portList = res.ports
     }
 
-    // 规范化端口对象 - 基于 PerformanceData 的字段
+    // 规范化端口对象 - 基于PerformanceData的字段
     const normalizedPorts = portList
       .filter(p => p && p.portName)  // 只保留有真实端口名的记录
       .map(p => ({
         id: p.id || p.portIndex,
         portName: p.portName,
-        // 有流量表示 up，无流量或为0表示 down
+        // 有流量表示up，无流量或为0表示down
         operStatus: ((p.ifInRate && p.ifInRate > 0) || (p.ifOutRate && p.ifOutRate > 0)) ? 'up' : 'up',
         // 根据速率估算带宽
         speed: p.ifInRate || p.ifOutRate || 0,
@@ -3960,7 +3948,7 @@ const loadDevicePorts = async (deviceId, type) => {
   } catch (error) {
     console.error('获取设备端口失败:', error)
     ElMessage.warning('获取设备端口失败，请手动输入端口名')
-    // 不提供硬编码 fallback 端口，保持端口列表为空
+    // 不提供硬编码fallback端口，保持端口列表为空
     // 用户可通过下拉框的手动输入功能（allow-create）输入端口名
     setPorts([])
   } finally {
@@ -4289,7 +4277,6 @@ const deleteDevice = async () => {
   }
 }
 
-/** dataURL → Blob */
 const dataUrlToBlob = (dataUrl) => {
   const parts = dataUrl.split(',')
   const mime = (parts[0].match(/:(.*?);/) || [])[1] || 'image/png'
@@ -4300,7 +4287,6 @@ const dataUrlToBlob = (dataUrl) => {
   return new Blob([bytes], { type: mime })
 }
 
-/** 弹出系统「另存为」；不支持则回退为浏览器下载 */
 const saveBlobAs = async (blob, suggestedName, acceptTypes) => {
   if (typeof window.showSaveFilePicker === 'function') {
     try {
@@ -4351,7 +4337,7 @@ const exportTopology = async (type) => {
             { backgroundColor: '#f5f7fa', padding: [20, 20, 20, 20] }
           )
         } else {
-          // 少数环境下仅有 toDataURL
+          // 少数环境下仅有toDataURL
           const res = graph.toDataURL(mime, '#f5f7fa')
           resolve(res)
         }
@@ -4499,7 +4485,6 @@ watch(
   }
 )
 
-/** 助手工具结果回写本页 */
 watch(
   () => pageSink.token,
   async (token) => {
@@ -4523,7 +4508,7 @@ watch(
         onSamePage: async (d) => {
           // 同页高亮由拓扑自身逻辑处理
           if (d?.highlight || d?.query?.highlight) {
-            /* highlight handled via query if we stay */
+            
           }
         }
       })
@@ -4592,7 +4577,6 @@ onUnmounted(() => {
   overflow: hidden;
 }
 
-/* —— 商业拓扑顶栏：命令行 + 状态条 —— */
 .topo-chrome {
   flex-shrink: 0;
   background: #fff;
@@ -5513,8 +5497,8 @@ onUnmounted(() => {
 .legend-line.device-offline {
   background: repeating-linear-gradient(
     90deg,
-    #c0c4cc 0,
-    #c0c4cc 4px,
+#c0c4cc 0,
+#c0c4cc 4px,
     transparent 4px,
     transparent 8px
   );
@@ -5523,8 +5507,8 @@ onUnmounted(() => {
 .legend-line.offline {
   background: repeating-linear-gradient(
     90deg,
-    #d4380d 0,
-    #d4380d 4px,
+#d4380d 0,
+#d4380d 4px,
     transparent 4px,
     transparent 8px
   );

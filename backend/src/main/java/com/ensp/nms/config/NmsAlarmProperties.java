@@ -4,22 +4,24 @@ import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.Arrays;
+import java.util.LinkedHashSet;
+import java.util.Set;
 
 /**
- * 告警策略：阅知类 trapType 确认即办结（ACK 后直接 CLEARED）。
- */
+ * 告警策略：阅知类trapType确认即办结。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15 */
+
 @Data
 @Component
 @ConfigurationProperties(prefix = "nms.alarm")
 public class NmsAlarmProperties {
 
-    /**
-     * 确认即关闭的 trapType 白名单（精确匹配，忽略首尾空白）。
-     * 默认不含「路由告警-OSPF邻居状态变更」。
-     */
-    private List<String> ackClosesTypes = new ArrayList<>(List.of(
+    private Set<String> ackClosesTypes = new LinkedHashSet<>(Arrays.asList(
             "用户管理-用户登录",
             "用户管理-用户退出",
             "用户管理-登录退出",
@@ -45,15 +47,9 @@ public class NmsAlarmProperties {
     ));
 
     public boolean isAckClosesType(String trapType) {
-        if (trapType == null || trapType.isBlank() || ackClosesTypes == null || ackClosesTypes.isEmpty()) {
+        if (trapType == null || trapType.isBlank() || ackClosesTypes == null) {
             return false;
         }
-        String t = trapType.trim();
-        for (String s : ackClosesTypes) {
-            if (s != null && t.equals(s.trim())) {
-                return true;
-            }
-        }
-        return false;
+        return ackClosesTypes.contains(trapType.trim());
     }
 }

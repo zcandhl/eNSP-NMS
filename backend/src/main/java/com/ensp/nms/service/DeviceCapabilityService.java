@@ -9,6 +9,14 @@ import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
 
+/**
+ * 按设备型号解析能力矩阵并补充设备能力标识。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15 */
+
 @Service
 public class DeviceCapabilityService {
 
@@ -85,7 +93,7 @@ public class DeviceCapabilityService {
         device.setDeviceType(type.getCode());
         device.setMonitorMode(mode.getCode());
 
-        // AC6005 在 eNSP 中 SSH 服务异常，AC 类设备默认走 telnet；其余默认 SSH
+        // AC类设备SSH服务异常，默认走telnet；其余默认SSH
         if (device.getManagementProtocol() == null || device.getManagementProtocol().isBlank()) {
             device.setManagementProtocol(type == DeviceType.AC ? "telnet" : "ssh");
         } else {
@@ -93,9 +101,6 @@ public class DeviceCapabilityService {
         }
     }
 
-    /**
-     * 根据名称 / sysDescr / sysObjectID 启发式识别设备类型。
-     */
     public DeviceType detectType(String name, String sysDescr, String sysObjectId, String model) {
         String blob = ((name == null ? "" : name) + " "
                 + (sysDescr == null ? "" : sysDescr) + " "

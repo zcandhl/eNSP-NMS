@@ -1,3 +1,13 @@
+/**
+ * @file    DeviceList.vue
+ * @module  视图页/设备
+ * @desc    设备台账列表与批量操作页。
+ *
+ * @author  ZC
+ * @date    2026-08-15 * @version 1.0.0
+ * @requires @element-plus/icons-vue, element-plus, pinia, vue, vue-router, @/api/device, @/components/DeviceDetailDrawer, @/composables/askOpsAssistant, @/composables/useVisibilityPoller, @/composables/webTerminalBus, @/stores/auth, @/stores/device, @/stores/project, @/utils/deviceCapabilities
+ */
+
 <template>
   <div class="nms-page device-list">
     <div class="nms-page-header">
@@ -261,7 +271,7 @@
     </div>
   </div>
 
-  <!-- 录入方式选择：工程页“录入设备”直达时先让用户选，不强制弹表单 -->
+  
   <el-dialog v-model="entryChooserVisible" title="设备录入" width="560px">
     <p class="entry-chooser-tip">
       当前工程「{{ activeProjectName }}」还没有纳管设备。选择一种录入方式，或先浏览设备列表：
@@ -446,7 +456,7 @@
   >
     <el-form :model="discoverForm" label-width="110px" :disabled="discovering">
       <el-form-item label="网段">
-        <el-input v-model="discoverForm.network" placeholder="例如: 192.168.56.0" />
+        <el-input v-model="discoverForm.network" placeholder="例如: 192.168.1.0" />
       </el-form-item>
       <el-form-item label="Community">
         <el-input v-model="discoverForm.community" placeholder="默认 public" />
@@ -732,7 +742,6 @@ const endpointDiscovering = ref(false)
 const importing = ref(false)
 const showAddDialog = ref(false)
 
-// ── 录入方式选择（工程页“录入设备”直达） ──
 const entryChooserVisible = ref(false)
 const activeProjectName = computed(
   () => projects.value.find((p) => p.id === projectId.value)?.name || ''
@@ -765,7 +774,7 @@ const pagination = ref({
 })
 
 const discoverForm = ref({
-  network: '192.168.56.0',
+  network: '192.168.1.0',
   timeout: 30,
   community: 'public',
   snmpPort: 161
@@ -875,7 +884,7 @@ const loadStats = async () => {
       withSsh: Number(res?.withSsh || 0)
     }
   } catch {
-    /* ignore */
+    
   }
 }
 
@@ -1265,7 +1274,7 @@ const openGroupMembers = async (group) => {
   editingGroup.value = group
   groupMembersVisible.value = true
   try {
-    // 分页拉取可选设备，避免全量 getDevices 触发后端告警阈值
+    // 分页拉取可选设备，避免全量getDevices触发后端告警阈值
     const res = await deviceApi.queryDevices({ page: 0, size: 200, sort: 'id,asc' })
     const content = Array.isArray(res?.content) ? res.content : []
     const list = await deviceGroupApi.devices(group.id)
@@ -1393,7 +1402,6 @@ const testConnectivityFromForm = async () => {
   }
 }
 
-/** 切换协议时同步默认端口：Telnet 23 / SSH 22，避免用户在错误端口上排查 */
 const onManagementProtocolChange = (protocol) => {
   if (protocol === 'telnet') {
     if (!deviceForm.value.sshPort || deviceForm.value.sshPort === 22) {
@@ -1404,7 +1412,6 @@ const onManagementProtocolChange = (protocol) => {
   }
 }
 
-/** 编辑时只拷贝可编辑字段，绝不绑定表格行引用，避免同名设备互相串改 */
 const editDevice = (device) => {
   if (!device || device.id == null) {
     ElMessage.error('设备数据无效')
@@ -1453,7 +1460,7 @@ const resetForm = () => {
 const openAddDialog = () => {
   editMode.value = false
   formNonce.value += 1
-  // 新建设备默认归入当前工程（全局上下文）
+  // 新建设备默认归入当前工程
   deviceForm.value = { ...emptyForm(), projectId: projectId.value || null }
   showAddDialog.value = true
 }
@@ -1761,7 +1768,6 @@ onUnmounted(() => {
   flex-wrap: wrap;
 }
 
-/* 远程管理协议标记：SSH 常规色，Telnet 用提示色提醒明文风险 */
 .dev-proto {
   font-size: 10px;
   line-height: 1;
@@ -1807,7 +1813,7 @@ onUnmounted(() => {
 </style>
 
 <style scoped>
-/* ── 录入方式选择对话框 ── */
+
 .entry-chooser-tip {
   margin: 0 0 12px;
   font-size: 13px;

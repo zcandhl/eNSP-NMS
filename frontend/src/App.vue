@@ -1,12 +1,22 @@
+/**
+ * @file    App.vue
+ * @module  布局/根组件
+ * @desc    根组件：承载侧边导航、顶栏与视图路由出口。
+ *
+ * @author  ZC
+ * @date    2026-08-15 * @version 1.0.0
+ * @requires @element-plus/icons-vue, pinia, vue, vue-router, @/components/BrandLogo, @/components/FloatingWebTerminal, @/components/HeaderAlarmBell, @/components/HeaderDeviceSearch, @/components/HeaderProjectSwitcher, @/components/ThemePicker, @/components/ops-assistant/FloatingOpsAssistant, @/composables/opsAssistantBus, @/composables/webTerminalBus, @/stores/auth, @/stores/theme
+ */
+
 <template>
   <router-view v-if="isLoginPage" />
   <el-container v-else class="app-shell">
     <el-aside :width="asideCollapsed ? '64px' : '220px'" class="app-aside" :class="{ collapsed: asideCollapsed }">
       <div class="brand" @click="asideCollapsed = !asideCollapsed" title="折叠/展开">
-        <div class="brand-mark">N</div>
+        <span class="brand-mark"><BrandLogo :size="30" /></span>
         <div v-show="!asideCollapsed" class="brand-text">
-          <div class="brand-name">eNSP NMS</div>
-          <div class="brand-tag">Network Manager</div>
+          <div class="brand-name">预验通</div>
+          <div class="brand-tag">预实施验证系统</div>
         </div>
       </div>
       <el-menu
@@ -78,7 +88,7 @@
     <el-container class="app-main-wrap">
       <el-header class="app-header" height="56px">
         <div class="header-left">
-          <!-- 页面名已由各页标题承担，顶栏左侧改为放全局工程上下文，不再重复 -->
+          
           <HeaderProjectSwitcher />
         </div>
         <div class="header-right">
@@ -136,19 +146,18 @@ import { useThemeStore } from '@/stores/theme'
 import FloatingOpsAssistant from '@/components/ops-assistant/FloatingOpsAssistant.vue'
 import FloatingWebTerminal from '@/components/FloatingWebTerminal.vue'
 import ThemePicker from '@/components/ThemePicker.vue'
+import BrandLogo from '@/components/BrandLogo.vue'
 import HeaderProjectSwitcher from '@/components/HeaderProjectSwitcher.vue'
 import HeaderAlarmBell from '@/components/HeaderAlarmBell.vue'
 import HeaderDeviceSearch from '@/components/HeaderDeviceSearch.vue'
 import { openWebTerminal } from '@/composables/webTerminalBus'
 import { openOpsAssistant } from '@/composables/opsAssistantBus'
-import { useLicenseInfo } from '@/composables/useLicenseInfo'
 
 const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
 const theme = useThemeStore()
 const { shell, accent } = storeToRefs(theme)
-const { load: loadLicense } = useLicenseInfo()
 const asideCollapsed = ref(false)
 
 const menuTextColor = computed(() => shell.value.sidebarText)
@@ -196,7 +205,6 @@ const openAssistant = () => {
 }
 
 onMounted(() => {
-  loadLicense()
   if (auth.isAuthenticated) {
     auth.fetchMe().catch(() => {})
   }
@@ -232,16 +240,12 @@ onMounted(() => {
 .brand-mark {
   width: 32px;
   height: 32px;
-  border-radius: 8px;
-  background: linear-gradient(145deg, var(--el-color-primary-light-3), var(--nms-primary));
-  color: #fff;
-  font-weight: 700;
-  font-size: 15px;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 12px color-mix(in srgb, var(--nms-primary) 35%, transparent);
+  color: var(--el-color-primary);
   flex-shrink: 0;
+  cursor: pointer;
 }
 
 .brand-name {

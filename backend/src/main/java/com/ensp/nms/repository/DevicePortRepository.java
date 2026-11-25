@@ -9,11 +9,18 @@ import org.springframework.stereotype.Repository;
 
 import java.util.List;
 
+/**
+ * 设备端口数据访问仓库：封装对应实体的持久化查询与写入。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15 */
+
 @Repository
 public interface DevicePortRepository extends JpaRepository<DevicePort, Long> {
     List<DevicePort> findByDeviceId(Long deviceId);
 
-    /** bulk delete：立即执行 SQL，避免与父表 device 删除的 flush 顺序冲突 */
     @Modifying
     @Query("DELETE FROM DevicePort p WHERE p.deviceId = :deviceId")
     int deleteAllByDeviceId(@Param("deviceId") Long deviceId);

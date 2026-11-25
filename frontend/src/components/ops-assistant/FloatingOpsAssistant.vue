@@ -1,3 +1,13 @@
+/**
+ * @file    FloatingOpsAssistant.vue
+ * @module  运维助手组件
+ * @desc    智能运维助手悬浮入口。
+ *
+ * @author  ZC
+ * @date    2026-08-15 * @version 1.0.0
+ * @requires @element-plus/icons-vue, vue, vue-router, @/composables/opsAssistantBus
+ */
+
 <template>
   <Teleport to="body">
     <div class="foa-root">
@@ -30,7 +40,6 @@ const route = useRoute()
 const expanded = ref(false)
 const panelRef = ref(null)
 
-/** 工作台 / 告警列表已有右栏作业条：隐藏 FAB，Ctrl+K 仍可用 */
 const hideFab = computed(() => {
   const p = route.path || ''
   return p.startsWith('/aiops/workbench') || p === '/aiops' || p.startsWith('/alarms')
@@ -114,8 +123,7 @@ onUnmounted(() => {
   position: fixed;
   right: 24px;
   bottom: 24px;
-  /* 低于 Element Plus 弹层（drawer/dialog 从 2000 起），避免压住抽屉/弹窗底部的操作按钮；
-     高于普通页面内容，正常浏览时仍悬浮在最上层 */
+  
   z-index: 1500;
 }
 .foa-fab {

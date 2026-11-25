@@ -4,7 +4,12 @@ import java.util.Locale;
 
 /**
  * 设备类型：用于图标、能力矩阵与差异化监控。
- */
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15 */
+
 public enum DeviceType {
     ROUTER("router"),
     SWITCH("switch"),

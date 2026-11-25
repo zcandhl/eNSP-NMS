@@ -11,6 +11,14 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 
+/**
+ * 定时调度到期的配置备份任务。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15 */
+
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -18,7 +26,7 @@ public class BackupTaskScheduler {
 
     private final BackupScheduleService backupScheduleService;
 
-    @Scheduled(cron = "0 * * * * ?") // 每分钟检查一次
+    @Scheduled(cron = "0 * * * * ?")
     public void runScheduledBackups() {
         List<BackupSchedule> activeSchedules = backupScheduleService.getActiveSchedules();
         LocalDateTime now = LocalDateTime.now();
@@ -49,7 +57,7 @@ public class BackupTaskScheduler {
             return false;
         }
 
-        // 同一分钟内已执行过则跳过，避免 cron 抖动重复跑
+        // 同一分钟内已执行过则跳过，避免cron抖动重复跑
         if (alreadyRanThisMinute(schedule.getLastRun(), now)) {
             return false;
         }
@@ -58,7 +66,7 @@ public class BackupTaskScheduler {
         return switch (type) {
             case "weekly" -> matchesWeekly(schedule, now);
             case "monthly" -> matchesMonthly(schedule, now);
-            default -> true; // daily
+            default -> true;
         };
     }
 
@@ -86,7 +94,7 @@ public class BackupTaskScheduler {
             expected = 1;
         }
         int lastDay = now.toLocalDate().lengthOfMonth();
-        int day = Math.min(expected, lastDay); // 31 日在 2 月落到月末
+        int day = Math.min(expected, lastDay); // 31日在2月落到月末
         return now.getDayOfMonth() == day;
     }
 }

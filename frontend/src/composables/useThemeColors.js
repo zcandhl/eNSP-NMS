@@ -1,8 +1,17 @@
+/**
+ * @file    useThemeColors.js
+ * @module  组合式逻辑
+ * @desc    主题色计算与 CSS 变量注入。
+ *
+ * @author  ZC
+ * @date    2026-08-15 * @version 1.0.0
+ * @requires pinia, vue, @/stores/theme
+ */
+
 import { watch, onMounted, onUnmounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useThemeStore } from '@/stores/theme'
 
-/** 读取当前主题主色（画布 / ECharts 等无法直接用 CSS 变量时） */
 export function readThemePrimary() {
   if (typeof document === 'undefined') return '#2b7de9'
   return (
@@ -24,10 +33,6 @@ export function primaryAlpha(alpha) {
   return `rgba(${readThemePrimaryRgb()}, ${alpha})`
 }
 
-/**
- * 主题变更时回调（子页图表、拓扑画布等需手动刷新）
- * @param {() => void} callback
- */
 export function useThemeSync(callback) {
   const theme = useThemeStore()
   const { accentId, shellId, revision } = storeToRefs(theme)

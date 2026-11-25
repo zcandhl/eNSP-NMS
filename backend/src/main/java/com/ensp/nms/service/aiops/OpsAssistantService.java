@@ -20,8 +20,13 @@ import java.util.Locale;
 import java.util.Map;
 
 /**
- * 本地知识库运维助手（规则匹配 + 证据上下文，不自动改配）。
- */
+ * 本地知识库运维助手：规则匹配与证据上下文，不自动改配。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15 */
+
 @Service
 @RequiredArgsConstructor
 public class OpsAssistantService {
@@ -35,7 +40,7 @@ public class OpsAssistantService {
     private static final List<Knowledge> KB = List.of(
             new Knowledge(List.of("离线", "offline", "不通", "ping", "宕机"),
                     "设备离线排查",
-                    "1) 在设备管理刷新状态或 Ping；2) 检查 eNSP 设备是否启动及网卡桥接；3) 在拓扑查看上联邻居；4) 若为连带告警，优先恢复上游；5) 需要时可在智能中心对根因设备「确认后备份」当前配置再操作。",
+                    "1) 在设备管理刷新状态或 Ping；2) 检查设备是否启动及网卡桥接；3) 在拓扑查看上联邻居；4) 若为连带告警，优先恢复上游；5) 需要时可在智能中心对根因设备「确认后备份」当前配置再操作。",
                     List.of("/devices", "/topology", "/aiops")),
             new Knowledge(List.of("cpu", "内存", "memory", "性能", "基线", "越限"),
                     "性能异常排查",
@@ -59,7 +64,7 @@ public class OpsAssistantService {
                     List.of("/aiops", "/performance")),
             new Knowledge(List.of("仿真", "模拟", "假数据", "来源", "snmp"),
                     "指标可信度",
-                    "1) 性能数据带有 snmp/simulated 来源标注；2) 仿真值仅用于曲线展示；3) 阈值告警与基线检测默认忽略仿真；4) 若设备长期无真实 OID，请检查 SNMP 团体字与 eNSP 设备能力。",
+                    "1) 性能数据带有 snmp/simulated 来源标注；2) 仿真值仅用于曲线展示；3) 阈值告警与基线检测默认忽略仿真；4) 若设备长期无真实 OID，请检查 SNMP 团体字与设备能力。",
                     List.of("/performance", "/aiops"))
     );
 

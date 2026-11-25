@@ -1,3 +1,13 @@
+/**
+ * @file    RunResultPanel.vue
+ * @module  视图页/验收组件
+ * @desc    验收执行结果面板。
+ *
+ * @author  ZC
+ * @date    2026-11-22 * @version 1.0.0
+ * @requires @element-plus/icons-vue, element-plus, vue, @/api/acceptance, @/stores/auth
+ */
+
 <template>
   <div class="result-panel">
     <div class="result-head">
@@ -172,7 +182,6 @@ defineEmits(['view-raw', 'confirm', 'stop', 'void', 'delete'])
 const auth = useAuthStore()
 const activeId = ref(null)
 
-// ── AI 执行摘要 ──
 const aiVisible = ref(false)
 const aiLoading = ref(false)
 const aiResult = ref(null)

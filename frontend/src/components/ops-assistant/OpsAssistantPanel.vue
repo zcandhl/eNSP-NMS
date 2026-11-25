@@ -1,3 +1,13 @@
+/**
+ * @file    OpsAssistantPanel.vue
+ * @module  运维助手组件
+ * @desc    运维助手对话面板，展示建议与工具操作。
+ *
+ * @author  ZC
+ * @date    2026-08-15 * @version 1.0.0
+ * @requires @element-plus/icons-vue, element-plus, vue, vue-router, @/api/device, @/composables/opsAssistantBus, @/composables/pageOpsBus, @/composables/useOpsTools, @/stores/auth
+ */
+
 <template>
   <div class="oap" :class="{ embedded }">
     <header class="oap-hd">
@@ -90,7 +100,7 @@
         </div>
       </div>
 
-      <!-- 主阅读区：结论完整展开，只滚这一层 -->
+      
       <div class="oap-job" ref="jobScrollRef" v-loading="sending">
         <template v-if="job">
           <div class="oap-verdict" :class="job.level">
@@ -117,7 +127,7 @@
         </div>
       </div>
 
-      <!-- 执行反馈：贴在动作上方，不占结论阅读空间 -->
+      
       <div v-if="latestRun" class="oap-feedback" :class="{ bad: latestRun.ok === false, ok: latestRun.ok === true }">
         <div class="oap-feedback-main">
           <span class="oap-feedback-k">刚才</span>
@@ -194,7 +204,7 @@ const inputRef = ref(null)
 const jobScrollRef = ref(null)
 const lastFallback = ref(true)
 const job = ref(null)
-/** 动作执行记录（反馈条展示最新一条，不挤占结论） */
+
 const runLog = ref([])
 const showRunHistory = ref(false)
 
@@ -309,7 +319,7 @@ async function loadSettings() {
       baseUrl: s.baseUrl || 'http://127.0.0.1:11434',
       model: s.model || 'qwen2.5:7b', apiKey: s.apiKey || ''
     })
-  } catch { /* ignore */ }
+  } catch {  }
 }
 
 async function saveSettings() {
@@ -409,7 +419,7 @@ async function assist(question) {
     ElMessage.error(e?.response?.data?.message || e?.message || '助手请求失败')
   } finally {
     sending.value = false
-    // 不在诊断后强制 focus，避免浏览器把页面滚到输入框
+    // 不在诊断后强制focus，避免浏览器把页面滚到输入框
   }
 }
 
@@ -479,16 +489,16 @@ defineExpose({ focusInput, loadSettings, runDiagnose })
 </script>
 
 <style scoped>
-/* 浮窗：深色作业卡（叠在业务页上） */
+
 .oap {
-  --oap-bg: #0b1220;
-  --oap-panel: #121a2b;
-  --oap-line: #243044;
-  --oap-text: #e8eef8;
-  --oap-muted: #8b9bb4;
-  --oap-accent: var(--el-color-primary);
-  --oap-fill: #152036;
-  --oap-input-bg: #121a2b;
+--oap-bg: #0b1220;
+--oap-panel: #121a2b;
+--oap-line: #243044;
+--oap-text: #e8eef8;
+--oap-muted: #8b9bb4;
+--oap-accent: var(--el-color-primary);
+--oap-fill: #152036;
+--oap-input-bg: #121a2b;
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -500,15 +510,14 @@ defineExpose({ focusInput, loadSettings, runDiagnose })
   overflow-anchor: none;
 }
 
-/* 内嵌：跟随网管浅色工作台 */
 .oap.embedded {
-  --oap-bg: var(--el-bg-color);
-  --oap-panel: var(--el-fill-color-blank, #fff);
-  --oap-line: var(--el-border-color-lighter);
-  --oap-text: var(--el-text-color-primary);
-  --oap-muted: var(--el-text-color-secondary);
-  --oap-fill: var(--el-fill-color-light);
-  --oap-input-bg: var(--el-fill-color-blank, #fff);
+--oap-bg: var(--el-bg-color);
+--oap-panel: var(--el-fill-color-blank, #fff);
+--oap-line: var(--el-border-color-lighter);
+--oap-text: var(--el-text-color-primary);
+--oap-muted: var(--el-text-color-secondary);
+--oap-fill: var(--el-fill-color-light);
+--oap-input-bg: var(--el-fill-color-blank, #fff);
   border: none;
   border-radius: 0;
   overflow: hidden;
@@ -593,9 +602,9 @@ defineExpose({ focusInput, loadSettings, runDiagnose })
   gap: 4px;
 }
 .oap:not(.embedded) .oap-intents :deep(.el-button) {
-  --el-button-text-color: var(--oap-text);
-  --el-button-bg-color: var(--oap-fill);
-  --el-button-hover-bg-color: #1a2740;
+--el-button-text-color: var(--oap-text);
+--el-button-bg-color: var(--oap-fill);
+--el-button-hover-bg-color: #1a2740;
 }
 
 .oap-job {

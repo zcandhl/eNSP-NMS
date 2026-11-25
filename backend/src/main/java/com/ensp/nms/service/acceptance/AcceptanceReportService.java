@@ -32,24 +32,21 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * 验收报告：三输入装配——方案（清单与准则）+ 批次快照（实测值）+ 输出格式。
+ * 验收报告条目生成、查询与文档导出。
  *
- * 输出为真正的 Word（.docx，Apache POI XWPF 生成），按批次实际测试内容装配：
- * 封面 → 验收依据 → 工程概况 → 验收组织 → 测试方法与环境 → 验收项清单 → 分项测试结果 →
- * 问题清单（含整改责任与期限）→ 结论与统计（三级结论）→ 签字栏 → 附录 A。
- * 页眉带受控标识（文件编号/版本），页脚带页码。下载接口路径与前端契约不变。
- *
- * 铁律：报告只读批次快照，同一批次永远同一份报告，生成时不重跑任何测试。
- */
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-11-22 */
+
 @Service
 @RequiredArgsConstructor
 public class AcceptanceReportService {
 
-    /** 报告存储：内存（实验室阶段够用；正式移交版本落盘并入库归档） */
+/** 报告存储：内存暂存，正式版本落盘并入库归档 */
     public record ReportEntry(String no, String name, byte[] content, String batchId) {
     }
 
-    /** Word 下载响应类型 */
     public static final String DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
     private static final String FONT_BODY = "宋体";
@@ -58,7 +55,6 @@ public class AcceptanceReportService {
     private static final DateTimeFormatter TS = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     private static final DateTimeFormatter DAY = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
-    /** 分项状态 → [中文标签, 着色]：PASS 绿 / FINDING 橙 / FAIL 红 / 其他灰 */
     private static final Map<String, String[]> STATUS_LABEL = Map.of(
             "PASS", new String[]{"通过", "00B050"},
             "FINDING", new String[]{"发现问题（待整改）", "ED7D31"},
@@ -110,12 +106,9 @@ public class AcceptanceReportService {
         return store.get(reportId);
     }
 
-    // ────────────────────────── Word 装配 ──────────────────────────
-
-    /** 包可见便于单元测试：装配并输出 docx 字节流 */
     byte[] renderDocx(AcceptanceProject project, AcceptancePlan plan, AcceptanceBatch batch,
                       List<Map<String, Object>> items) {
-        // username → 真实姓名（验收组织与整改责任人展示用）
+        // username → 真实姓名
         Map<String, String> realNames = new LinkedHashMap<>();
         userService.getAllUsers().forEach(u ->
                 realNames.put(u.getUsername(), u.getRealName() == null ? u.getUsername() : u.getRealName()));
@@ -143,7 +136,6 @@ public class AcceptanceReportService {
         }
     }
 
-    /** 页眉受控标识（文件编号/版本/出具方）+ 页脚页码，全页生效 */
     private void setHeaderFooter(XWPFDocument doc, String reportNo) {
         XWPFHeader header = doc.createHeader(HeaderFooterType.DEFAULT);
         XWPFParagraph hp = header.getParagraphArray(0) != null ? header.getParagraphArray(0) : header.createParagraph();
@@ -161,7 +153,6 @@ public class AcceptanceReportService {
         run(fp, " 页", FONT_BODY, 9, false, "595959");
     }
 
-    /** ── 封面：标题 + 结论速览 + 三方元信息 ── */
     private void cover(XWPFDocument doc, AcceptanceProject project, AcceptancePlan plan,
                        AcceptanceBatch batch, List<Map<String, Object>> items) {
         String projectName = project != null ? project.getName() : "网络工程";
@@ -204,7 +195,6 @@ public class AcceptanceReportService {
         doc.createParagraph().setPageBreak(true);
     }
 
-    /** ── 一、验收依据 ── */
     private void chapterBasis(XWPFDocument doc) {
         heading1(doc, "一、验收依据");
         for (String line : new String[]{
@@ -217,7 +207,6 @@ public class AcceptanceReportService {
         }
     }
 
-    /** ── 二、工程概况 ── */
     private void chapterOverview(XWPFDocument doc, AcceptanceProject project) {
         heading1(doc, "二、工程概况");
         if (project == null) {
@@ -236,11 +225,10 @@ public class AcceptanceReportService {
         kvTable(doc, rows, 2600, 6600);
     }
 
-    /** ── 三、验收组织与人员分工（产业验收报告标配章节） ── */
     private void chapterOrganization(XWPFDocument doc, AcceptanceProject project,
                                      List<Map<String, Object>> items, Map<String, String> realNames) {
         heading1(doc, "三、验收组织与人员分工");
-        // 测试执行人：本批次各检查项负责人的真实姓名（去重）
+        // 测试执行人：本批次各检查项负责人的真实姓名
         Set<String> executors = new LinkedHashSet<>();
         for (Map<String, Object> it : items) {
             String owner = s(it.get("owner"));
@@ -268,7 +256,6 @@ public class AcceptanceReportService {
                 FONT_BODY, 9, false, "808080", ParagraphAlignment.LEFT, 0);
     }
 
-    /** ── 四、测试方法与环境说明（证明方法可信，并向读者交代模拟环境属性） ── */
     private void chapterMethod(XWPFDocument doc) {
         heading1(doc, "四、测试方法与环境说明");
         for (String line : new String[]{
@@ -280,7 +267,6 @@ public class AcceptanceReportService {
         }
     }
 
-    /** ── 五、验收项清单（方案准则） ── */
     private void chapterChecklist(XWPFDocument doc, AcceptancePlan plan) {
         heading1(doc, "五、验收项清单与判定准则");
         List<Map<String, Object>> checks = parse(plan.getChecksJson()).stream()
@@ -301,7 +287,6 @@ public class AcceptanceReportService {
         }
     }
 
-    /** ── 六、分项测试结果：判定汇总表 + 逐项判定说明（专业验收版式，命令回显进附录 A） ── */
     private void chapterResultSummary(XWPFDocument doc, AcceptancePlan plan,
                                       List<Map<String, Object>> items, Map<String, String> realNames) {
         heading1(doc, "六、分项测试结果");
@@ -309,14 +294,14 @@ public class AcceptanceReportService {
             para(doc, "（批次快照为空）", FONT_BODY, 11, false, "808080", ParagraphAlignment.LEFT, 0);
             return;
         }
-        // 判定准则按检查项编号从方案取（旧批次快照不含准则，也能补全）
-        // 判定准则显示一句话中文（与方案设计/工作台同口径），解析不了回退表达式
+        // 判定准则按检查项编号从方案取
+        // 判定准则显示一句话中文，解析不了回退表达式
         Map<String, String> exprByCode = new java.util.HashMap<>();
         for (Map<String, Object> c : parse(plan.getChecksJson())) {
             exprByCode.put(s(c.get("code")), AcceptanceRuleText.describe(c));
         }
 
-        // 6.1 判定汇总表：一表看全部结论
+        // 6.1判定汇总表：一表看全部结论
         para(doc, "6.1  分项判定汇总", FONT_HEAD, 12, true, "1F3864", ParagraphAlignment.LEFT, 0);
         String[] head = {"编号", "检查项", "判定准则", "关键实测值", "单项结论"};
         int[] w = {900, 1900, 2800, 2400, 1200};
@@ -334,7 +319,7 @@ public class AcceptanceReportService {
             r++;
         }
 
-        // 6.2 逐项判定说明：准则 → 实测 → 结论 → 问题，文字化表达，评审可直接引用
+        // 6.2逐项判定说明：准则 → 实测 → 结论 → 问题，文字化表达，评审可直接引用
         para(doc, "6.2  逐项判定说明", FONT_HEAD, 12, true, "1F3864", ParagraphAlignment.LEFT, 0);
         int idx = 1;
         for (Map<String, Object> it : items) {
@@ -370,7 +355,6 @@ public class AcceptanceReportService {
         }
     }
 
-    /** ── 附录 A：采集原始记录（设备回显备查，正文不放命令输出） ── */
     private void appendixRaw(XWPFDocument doc, List<Map<String, Object>> items) {
         doc.createParagraph().setPageBreak(true);
         heading1(doc, "附录 A  采集原始记录（备查）");
@@ -401,12 +385,10 @@ public class AcceptanceReportService {
         }
     }
 
-    /** 关键实测值摘要：中文指标名=值（与前端 metricsText 同口径），过滤内部指标，用于汇总表 */
     private String metricsBrief(Object metricsObj) {
         return AcceptanceRuleText.metricsBrief(metricsObj);
     }
 
-    /** ── 七、问题清单（含整改责任人与建议期限，形成整改闭环） ── */
     private void chapterFindings(XWPFDocument doc, List<Map<String, Object>> items,
                                  AcceptanceBatch batch, Map<String, String> realNames) {
         heading1(doc, "七、问题清单");
@@ -449,7 +431,6 @@ public class AcceptanceReportService {
                 FONT_BODY, 9, false, "808080", ParagraphAlignment.LEFT, 0);
     }
 
-    /** ── 八、验收结论（三级结论：通过 / 有条件通过 / 不通过） ── */
     private void chapterConclusion(XWPFDocument doc, AcceptanceBatch batch, List<Map<String, Object>> items) {
         heading1(doc, "八、验收结论与统计");
         long pass = count(items, "PASS");
@@ -487,7 +468,6 @@ public class AcceptanceReportService {
         }
     }
 
-    /** ── 九、签字栏 ── */
     private void chapterSignature(XWPFDocument doc) {
         heading1(doc, "九、签字栏");
         String[][] rows = {
@@ -504,9 +484,6 @@ public class AcceptanceReportService {
         para(doc, "（本页无正文，为签字页）", FONT_BODY, 9, false, "808080", ParagraphAlignment.CENTER, 0);
     }
 
-    // ────────────────────────── 排版工具 ──────────────────────────
-
-    /** A4 纵向页 */
     private void setA4(XWPFDocument doc) {
         CTSectPr sect = doc.getDocument().getBody().isSetSectPr()
                 ? doc.getDocument().getBody().getSectPr() : doc.getDocument().getBody().addNewSectPr();
@@ -565,7 +542,6 @@ public class AcceptanceReportService {
         r.setColor(color);
     }
 
-    /** 两列键值表：左列灰底表头风格 */
     private XWPFTable kvTable(XWPFDocument doc, String[][] rows, int wKey, int wVal) {
         XWPFTable t = dataTable(doc, new String[0], new int[]{wKey, wVal}, rows.length);
         for (int i = 0; i < rows.length; i++) {
@@ -576,7 +552,6 @@ public class AcceptanceReportService {
         return t;
     }
 
-    /** 带表头的数据表（head 为空则不建表头行） */
     private XWPFTable dataTable(XWPFDocument doc, String[] head, int[] widths, int bodyRows) {
         int rows = head.length + Math.max(bodyRows, 0);
         XWPFTable t = doc.createTable(Math.max(rows, 1), Math.max(widths.length, 1));
@@ -620,7 +595,6 @@ public class AcceptanceReportService {
         cell.setColor(hex);
     }
 
-    /** 结果行淡色底：绿/橙/红各给浅底色 */
     private String tint(String hex) {
         return switch (hex) {
             case "00B050" -> "EAF6EE";

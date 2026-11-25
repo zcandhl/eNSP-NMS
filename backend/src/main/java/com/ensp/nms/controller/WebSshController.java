@@ -9,6 +9,14 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
 
+/**
+ * Web SSH 交互式命令执行接口。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15 */
+
 @RestController
 @RequestMapping("/api/webssh")
 @RequiredArgsConstructor
@@ -34,7 +42,7 @@ public class WebSshController {
                 ));
             }
 
-            // AC 类设备走 telnet（其 SSH 服务在 eNSP 中不可用），其余走 SSH
+            // AC类设备走telnet，其余走SSH
             String protocol = device.isTelnetManagement()
                     ? SshClient.PROTOCOL_TELNET : SshClient.PROTOCOL_SSH;
             int port = device.getSshPort() != null && device.getSshPort() > 0

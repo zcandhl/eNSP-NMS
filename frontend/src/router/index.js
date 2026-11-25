@@ -1,3 +1,13 @@
+/**
+ * @file    index.js
+ * @module  路由配置
+ * @desc    路由表、登录守卫与权限路由注册。
+ *
+ * @author  ZC
+ * @date    2026-08-15 * @version 1.0.0
+ * @requires vue-router, @/stores/auth
+ */
+
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 

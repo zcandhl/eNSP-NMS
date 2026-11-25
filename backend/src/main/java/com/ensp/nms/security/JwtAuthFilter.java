@@ -21,6 +21,14 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * JWT 认证过滤器，解析令牌并装载登录身份与权限。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15 */
+
 @Component
 @RequiredArgsConstructor
 public class JwtAuthFilter extends OncePerRequestFilter {
@@ -38,7 +46,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         if (header != null && header.startsWith("Bearer ")) {
             String token = header.substring(7).trim();
             if (jwtService.isValid(token) && SecurityContextHolder.getContext().getAuthentication() == null) {
-                // /auth/me 允许用旧版本换发新 JWT；其余接口拒绝过期权限版本
+                // /auth/me允许用旧版本换发新JWT；其余接口拒绝过期权限版本
                 boolean refreshEndpoint = isAuthorityRefreshPath(request);
                 long tokenVer = jwtService.getAuthorityVersion(token);
                 long serverVer = authorityVersionService.current();
@@ -71,7 +79,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
     private boolean isAuthorityRefreshPath(HttpServletRequest request) {
         String path = request.getRequestURI();
         if (path == null) return false;
-        // 兼容 context-path
+        // 兼容context-path
         return path.endsWith("/api/auth/me") || path.endsWith("/auth/me");
     }
 

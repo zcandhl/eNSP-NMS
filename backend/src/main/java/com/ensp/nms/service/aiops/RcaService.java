@@ -28,9 +28,13 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
- * 轻量根因候选：离线拓扑影响 + 性能严重越限 + 近期配置变更时间窗；
- * 历史「不准确」反馈会对对应设备降权。
- */
+ * 轻量根因候选：离线拓扑影响、性能严重越限、近期配置变更时间窗。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15 */
+
 @Service
 @RequiredArgsConstructor
 public class RcaService {
@@ -75,7 +79,7 @@ public class RcaService {
 
         Map<Long, Map<String, Object>> byDevice = new LinkedHashMap<>();
 
-        // 1) 离线拓扑根因：影响面大、拓扑枢纽优先（贴合「关核心 → 风暴」）
+        // 1) 离线拓扑根因：影响面大、拓扑枢纽优先
         for (Long candidateId : offline) {
             Set<Long> allNeighbors = adj.getOrDefault(candidateId, Set.of());
             Set<Long> offlineNeighbors = allNeighbors.stream()
@@ -111,7 +115,7 @@ public class RcaService {
             byDevice.put(candidateId, row);
         }
 
-        // 2) 性能严重越限（在线设备）
+        // 2) 性能严重越限
         List<PerformanceAlert> dangerPerf = performanceAlertRepository
                 .findByStatusInOrderByCreatedAtDesc(List.of("active", "acknowledged"))
                 .stream()
@@ -186,7 +190,7 @@ public class RcaService {
             row.put("recentChangeType", latest.getChangeType());
         }
 
-        // 链路类活跃告警加分（已在候选中的设备）
+        // 链路类活跃告警加分
         for (Alarm alarm : open) {
             Long deviceId = alarm.getDeviceId();
             if (deviceId == null || !byDevice.containsKey(deviceId)) {
@@ -198,7 +202,7 @@ public class RcaService {
             }
         }
 
-        // 历史反馈降权：多次标记「不准确」的 RCA 候选得分下调
+        // 历史反馈降权：多次标记「不准确」的RCA候选得分下调
         Map<Long, Double> penalty = rcaFeedbackPenalty();
         for (Map.Entry<Long, Map<String, Object>> e : byDevice.entrySet()) {
             Double p = penalty.get(e.getKey());

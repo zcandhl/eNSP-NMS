@@ -18,6 +18,14 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+/**
+ * JWT 生成、解析与校验，携带用户名、角色、权限与版本号。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15 */
+
 @Service
 public class JwtService {
 
@@ -60,7 +68,7 @@ public class JwtService {
         if (v instanceof Number n) {
             return n.longValue();
         }
-        // 旧 token 无版本：视为 0，与当前版本不一致时将失效并要求重登
+        // 旧token无版本：视为0，与当前版本不一致时将失效并要求重登
         return 0L;
     }
 

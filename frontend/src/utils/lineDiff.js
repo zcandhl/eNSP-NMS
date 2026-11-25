@@ -1,6 +1,12 @@
 /**
- * 基于 LCS 的行级 diff；可过滤华为配置噪声行。
+ * @file    lineDiff.js
+ * @module  工具函数
+ * @desc    基于 LCS 的行级配置差异比对与噪声行过滤。
+ *
+ * @author  ZC
+ * @date    2026-08-15 * @version 1.0.0
  */
+
 export function normalizeConfigLine(line = '') {
   return String(line).replace(/\r$/, '')
 }
@@ -14,7 +20,7 @@ export function isNoiseConfigLine(line = '') {
   if (/^!Time:/i.test(s) || /^!.*?Time:/i.test(s)) return true
   if (/Last configuration was saved/i.test(s)) return true
   if (/^!Last /i.test(s)) return true
-  // display 回显与标题
+  // display回显与标题
   if (/^display\s+(current|saved)-configuration/i.test(s)) return true
   if (/Building configuration/i.test(s)) return true
   if (/Current configuration/i.test(s)) return true
@@ -85,7 +91,6 @@ export function diffLines(sourceText = '', targetText = '', options = {}) {
   return { added, removed, modified: 0, lines }
 }
 
-/** 导出 unified diff 文本 */
 export function toUnifiedDiff(diffResult, leftLabel = 'left', rightLabel = 'right') {
   const lines = diffResult?.lines || []
   const out = [

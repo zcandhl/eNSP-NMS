@@ -1,13 +1,17 @@
+/**
+ * @file    project.js
+ * @module  状态管理/项目
+ * @desc    当前验收项目状态管理。
+ *
+ * @author  ZC
+ * @date    2026-11-22 * @version 1.0.0
+ * @requires pinia, vue, @/api/index
+ */
+
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import request from '@/api/index'
 
-/**
- * 全局工程上下文：整个软件共享"当前在哪个工程"这件事。
- * - 工程档案来自验收工程的同一张表（工程是系统级实体，验收只是其上的活动）
- * - 顶栏切换器、设备管理、告警、验收各页都读这里
- * - projectId 持久化到 localStorage，刷新后保持
- */
 const KEY = 'ensp_nms_project'
 
 export const useProjectStore = defineStore('project', () => {
@@ -25,10 +29,7 @@ export const useProjectStore = defineStore('project', () => {
     else localStorage.removeItem(KEY)
   }
 
-  /**
-   * 拉取工程列表。默认只拉一次（顶栏与各页共享），CRUD 后传 force=true。
-   * 登录后由顶栏切换器触发；未登录时由调用方兜底。
-   */
+  
   async function load(force = false) {
     if (loaded.value && !force) return projects.value
     loading.value = true
@@ -50,14 +51,14 @@ export const useProjectStore = defineStore('project', () => {
     return projects.value
   }
 
-  /** 切换当前工程并持久化 */
+  
   function switchTo(id) {
     if (projectId.value === id) return
     projectId.value = id
     persist()
   }
 
-  /** 退出登录时清空（不删工程数据） */
+  
   function reset() {
     projectId.value = null
     persist()

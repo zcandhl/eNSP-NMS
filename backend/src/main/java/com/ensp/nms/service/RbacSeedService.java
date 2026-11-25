@@ -13,6 +13,14 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.*;
 import java.util.stream.Collectors;
 
+/**
+ * 初始化内置角色、权限与绑定关系。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15 */
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -21,10 +29,6 @@ public class RbacSeedService {
     private final PermissionRepository permissionRepository;
     private final RoleRepository roleRepository;
 
-    /**
-     * 幂等：补齐权限目录与预置角色，并同步预置角色的默认权限（仅当角色权限为空时写入默认集，
-     * 避免覆盖管理员在界面上手动调整过的权限）。ADMIN 始终对齐全量权限。
-     */
     @Transactional
     public void ensureRbacSeeded() {
         Map<String, Permission> byName = ensurePermissions();
@@ -71,7 +75,7 @@ public class RbacSeedService {
                         .collect(Collectors.toCollection(LinkedHashSet::new));
                 role.setPermissions(perms);
             } else {
-                // 预置角色增量补齐目录新增权限（如 aiops:read），不移除管理员已调整的权限
+                // 预置角色增量补齐目录新增权限，不移除管理员已调整的权限
                 Set<Permission> current = role.getPermissions();
                 if (current == null) {
                     current = new LinkedHashSet<>();

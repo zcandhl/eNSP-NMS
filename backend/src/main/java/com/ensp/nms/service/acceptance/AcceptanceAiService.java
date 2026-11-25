@@ -21,13 +21,13 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * 验收批次 AI 摘要：把冻结快照喂给大模型，产出「执行摘要 + 根因分析 + 整改建议」。
+ * 验收报告 AI 摘要与状态归纳。
  *
- * 定位纪律（与平台"AI 只建议、不裁决"原则一致）：
- * - 输入只有批次快照（事实），AI 不重新采集、不参与判定；
- * - 输出必须带免责声明，不写进验收结论，仅供报告撰写者参考；
- * - LLM 未启用/不可用时抛出明确异常，绝不阻塞验收主流程。
- */
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-11-22 */
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -50,9 +50,7 @@ public class AcceptanceAiService {
             6) 不要输出 Markdown 语法（不用 **、#、-、1.），直接输出纯文本行。
             """;
 
-    /** 单条检查项原始回显喂给模型的最大长度 */
     private static final int RAW_TRUNCATE = 700;
-    /** 摘要结果缓存：批次快照落定后不再变化，避免重复消耗推理时间 */
     private static final long CACHE_TTL_MS = 10 * 60 * 1000L;
 
     private final LlmSettingsService settingsService;
@@ -110,7 +108,6 @@ public class AcceptanceAiService {
         return out;
     }
 
-    /** AI 通道状态（供前端按钮置灰与提示） */
     public Map<String, Object> status() {
         LlmSettingsService.ResolvedSettings cfg = settingsService.resolve();
         Map<String, Object> m = new LinkedHashMap<>();
@@ -123,9 +120,6 @@ public class AcceptanceAiService {
         return m;
     }
 
-    // ────────────────────────── 数据整理 ──────────────────────────
-
-    /** 把批次快照压成模型可读的紧凑文本（只保留结论、指标、问题与截断后的关键回显） */
     private String buildDigest(AcceptanceBatch batch) {
         List<Map<String, Object>> items = fromJson(batch.getItemsJson());
         StringBuilder sb = new StringBuilder();
@@ -161,7 +155,6 @@ public class AcceptanceAiService {
         return truncate(sb.toString(), 16000);
     }
 
-    /** 解析三段标记，容错处理缺段/标记变体 */
     private Map<String, Object> parseSections(String raw) {
         Map<String, Object> out = new LinkedHashMap<>();
         String summary = section(raw, "执行摘要");

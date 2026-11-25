@@ -25,6 +25,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+/**
+ * 告警查询、统计、确认、清除与批量处理接口。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15 */
+
 @Slf4j
 @RestController
 @RequestMapping("/api/alarms")
@@ -38,9 +46,6 @@ public class AlarmController {
     @Autowired
     private AuditLogService auditLogService;
 
-    /**
-     * @deprecated 请使用 {@code GET /api/alarms/query} 分页接口。
-     */
     @Deprecated
     @GetMapping
     public ResponseEntity<List<Alarm>> getAllAlarms() {
@@ -77,7 +82,6 @@ public class AlarmController {
                 statuses, sev, keyword, fromTime, to, overdueOnly, overdueMinutes, deviceId, projectId, pageable));
     }
 
-    /** 按当前筛选导出 CSV（最多 2000 条） */
     @GetMapping("/export")
     public ResponseEntity<byte[]> exportAlarms(
             @RequestParam(required = false) List<String> status,
@@ -104,7 +108,7 @@ public class AlarmController {
 
         String csv = toCsv(rows);
         byte[] bytes = csv.getBytes(StandardCharsets.UTF_8);
-        // Excel 友好 BOM
+        // Excel友好BOM
         byte[] bom = new byte[]{(byte) 0xEF, (byte) 0xBB, (byte) 0xBF};
         byte[] out = new byte[bom.length + bytes.length];
         System.arraycopy(bom, 0, out, 0, bom.length);
@@ -195,7 +199,6 @@ public class AlarmController {
         return alarm.map(ResponseEntity::ok).orElse(ResponseEntity.notFound().build());
     }
 
-    /** 清理孤儿告警（设备已删除/不在库中）：把统计口径拉回当前网络真实状态 */
     @PostMapping("/purge-orphans")
     public ResponseEntity<Map<String, Object>> purgeOrphans(Authentication authentication) {
         int removed = alarmService.purgeOrphanAlarms();
@@ -291,10 +294,6 @@ public class AlarmController {
         return ResponseEntity.ok(res);
     }
 
-    /**
-     * 批量告警操作审计正文：写明「告警 ID」，并尽量带上标题/设备，避免用户只看到裸数字。
-     * 须在执行清除/删除前调用，以便仍能读到标题。
-     */
     private String buildAlarmBatchDetail(String opLabel, List<Long> ids) {
         if (ids == null || ids.isEmpty()) {
             return opLabel + "：未指定告警 ID";
@@ -366,7 +365,6 @@ public class AlarmController {
         return s;
     }
 
-    /** 兼容 status=A&status=B、status=A,B、以及 axios 默认的 status[]=A */
     private List<String> coalesceStatusParams(List<String> status, List<String> statusBracket) {
         if (status != null && !status.isEmpty()) {
             return status;
@@ -438,7 +436,6 @@ public class AlarmController {
         return ids;
     }
 
-    /** 确认人强制取登录用户，禁止客户端冒名 */
     @SuppressWarnings("unchecked")
     private String resolveOperator(Authentication authentication) {
         if (authentication == null || !authentication.isAuthenticated()) {

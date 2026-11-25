@@ -10,8 +10,13 @@ import java.nio.charset.Charset;
 import java.util.concurrent.TimeUnit;
 
 /**
- * ICMP / Ping 可达性探测（虚拟 PC 等无 SNMP 设备）。
- */
+ * ICMP/Ping可达性探测，覆盖无SNMP设备。
+ *
+ * @author  ZC
+ * @version 1.0.0
+ * @since   17
+ * @date    2026-08-15 */
+
 @Slf4j
 @Component
 public class IcmpClient {
@@ -68,7 +73,7 @@ public class IcmpClient {
             if (code == 0) {
                 return true;
             }
-            // 部分 Windows 区域设置下 exit code 不可靠，再看输出关键字
+            // 部分Windows区域设置下exit code不可靠，再看输出关键字
             return text.contains("ttl=") || text.contains("字节=") || text.contains("bytes=");
         } catch (Exception e) {
             log.debug("系统 ping 失败 {}: {}", host, e.getMessage());
