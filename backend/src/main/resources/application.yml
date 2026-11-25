@@ -63,6 +63,8 @@ nms:
   # 设备扫描的附加探测IP：管理地址不在扫描网段的设备，逗号分隔，由环境变量注入
   discovery:
     extra-ips: ${NMS_DISCOVERY_EXTRA_IPS:}
+    # 单次扫描允许探测的最大主机数，防止误填 /16 大网段打满后端
+    max-hosts: ${NMS_DISCOVERY_MAX_HOSTS:1024}
   # 阅知类trapType：确认即办结。高频提示/抖动类一并纳入；不含认证失败/离线/冷启动等需跟进项。
   alarm:
     ack-closes-types:

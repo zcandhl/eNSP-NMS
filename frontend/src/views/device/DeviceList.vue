@@ -456,7 +456,8 @@
   >
     <el-form :model="discoverForm" label-width="110px" :disabled="discovering">
       <el-form-item label="网段">
-        <el-input v-model="discoverForm.network" placeholder="例如: 192.168.1.0" />
+        <el-input v-model="discoverForm.network" placeholder="例如: 10.20.10.0/24 或 10.20.0.0/16" />
+        <div class="network-hint">支持 CIDR 掩码；纯 IP 默认按 /24，单次扫描上限 1024 台主机</div>
       </el-form-item>
       <el-form-item label="Community">
         <el-input v-model="discoverForm.community" placeholder="默认 public" />
@@ -1794,6 +1795,13 @@ onUnmounted(() => {
 .ssh-hint {
   margin-left: 8px;
   font-size: 12px;
+  color: var(--nms-text-secondary);
+}
+
+.network-hint {
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 1.5;
   color: var(--nms-text-secondary);
 }
 

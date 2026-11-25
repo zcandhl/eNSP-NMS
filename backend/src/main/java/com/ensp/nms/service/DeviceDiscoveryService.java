@@ -51,18 +51,24 @@ public class DeviceDiscoveryService {
     @Value("${nms.discovery.extra-ips:}")
     private String extraIpsConfig;
 
+    /**
+     * 单次扫描允许探测的最大主机数，防止误填 /16 之类大网段把后端打满。
+     */
+    @Value("${nms.discovery.max-hosts:1024}")
+    private int maxScanHosts;
+
     public DiscoverJobStatus startScan(String network, int timeoutSeconds, String community, int snmpPort) {
         cleanupExpiredJobs();
         if (jobs.size() >= MAX_JOBS) {
             throw new RuntimeException("发现任务过多，请稍后再试");
         }
 
-        String baseIp = parseBaseIp(network);
+        List<String> scanIps = expandScanIps(network);
         List<String> extraIps = resolveExtraIps();
         String jobId = UUID.randomUUID().toString().replace("-", "");
         DiscoverJobStatus job = new DiscoverJobStatus();
         job.setJobId(jobId);
-        job.setTotal(254 + extraIps.size());
+        job.setTotal(scanIps.size() + extraIps.size());
         job.setNetwork(network);
         job.setCommunity(blankToDefault(community, "public"));
         job.setSnmpPort(snmpPort > 0 ? snmpPort : 161);
@@ -73,7 +79,7 @@ public class DeviceDiscoveryService {
         int resolvedPort = job.getSnmpPort();
         int timeout = Math.max(5, Math.min(timeoutSeconds, 120));
 
-        jobExecutor.submit(() -> runScan(job, baseIp, resolvedCommunity, resolvedPort, timeout, extraIps));
+        jobExecutor.submit(() -> runScan(job, scanIps, resolvedCommunity, resolvedPort, timeout, extraIps));
         return snapshot(job);
     }
 
@@ -213,11 +219,10 @@ public class DeviceDiscoveryService {
         return new ArrayList<>(byIp.values());
     }
 
-    private void runScan(DiscoverJobStatus job, String baseIp, String community, int snmpPort, int timeoutSeconds,
+    private void runScan(DiscoverJobStatus job, List<String> scanIps, String community, int snmpPort, int timeoutSeconds,
                          List<String> extraIps) {
-        List<Future<DiscoverCandidate>> futures = new ArrayList<>(254 + extraIps.size());
-        for (int i = 1; i <= 254; i++) {
-            String ip = baseIp + i;
+        List<Future<DiscoverCandidate>> futures = new ArrayList<>(scanIps.size() + extraIps.size());
+        for (String ip : scanIps) {
             futures.add(scanExecutor.submit(() -> scanIp(ip, snmpPort, community)));
         }
         // 附加探测IP：管理地址不在扫描网段内的设备
@@ -445,14 +450,87 @@ public class DeviceDiscoveryService {
         return new ArrayList<>(ips);
     }
 
-    private String parseBaseIp(String network) {        if (network == null || network.isBlank()) {
+    /**
+     * 解析扫描网段并展开为待探测主机地址。
+     * 支持纯 IPv4（按 /24 处理，兼容旧写法）与 CIDR（如 10.20.10.0/24、10.20.0.0/16）。
+     * 展开主机数受 {@link #maxScanHosts} 上限保护，更宽前缀排除网络地址与广播地址。
+     */
+    private List<String> expandScanIps(String network) {
+        String input = network == null ? "" : network.trim();
+        if (input.isEmpty()) {
             throw new RuntimeException("网段不能为空");
         }
-        String[] parts = network.trim().split("\\.");
-        if (parts.length < 3) {
-            throw new RuntimeException("网段格式无效，例如: 192.168.1.0");
+        String addressPart = input;
+        int prefix = 24;
+        if (input.contains("/")) {
+            String[] parts = input.split("/");
+            if (parts.length != 2) {
+                throw new RuntimeException("网段格式无效，例如 192.168.1.0/24");
+            }
+            addressPart = parts[0].trim();
+            try {
+                prefix = Integer.parseInt(parts[1].trim());
+            } catch (NumberFormatException e) {
+                throw new RuntimeException("掩码长度无效，例如 /24");
+            }
         }
-        return parts[0] + "." + parts[1] + "." + parts[2] + ".";
+        if (prefix < 1 || prefix > 32) {
+            throw new RuntimeException("掩码长度需在 1–32 之间");
+        }
+        int[] octets = parseIpv4Octets(addressPart);
+        long total = 1L << (32 - prefix);
+        if (total > maxScanHosts) {
+            throw new RuntimeException(String.format("网段过大：该掩码含 %d 个地址，超过单次扫描上限 %d，请缩小掩码或拆分成多个网段",
+                    total, maxScanHosts));
+        }
+        long mask = (~0L << (32 - prefix)) & 0xFFFFFFFFL;
+        long base = ipv4ToLong(octets) & mask;
+        long end = base + total - 1;
+        LinkedHashSet<String> ips = new LinkedHashSet<>();
+        for (long addr = base; addr <= end; addr++) {
+            // /31、/32 为点对点/单地址，保留全部；更宽前缀排除网络地址与广播地址
+            if (prefix <= 30 && (addr == base || addr == end)) {
+                continue;
+            }
+            ips.add(longToIpv4(addr));
+        }
+        if (ips.isEmpty()) {
+            throw new RuntimeException("网段内没有可探测的主机地址");
+        }
+        return new ArrayList<>(ips);
+    }
+
+    private int[] parseIpv4Octets(String address) {
+        if (address == null || address.isBlank()) {
+            throw new RuntimeException("网段格式无效，例如 192.168.1.0/24");
+        }
+        String[] parts = address.split("\\.");
+        if (parts.length != 4) {
+            throw new RuntimeException("网段格式无效，例如 192.168.1.0/24");
+        }
+        int[] octets = new int[4];
+        for (int i = 0; i < 4; i++) {
+            int v;
+            try {
+                v = Integer.parseInt(parts[i].trim());
+            } catch (NumberFormatException e) {
+                throw new RuntimeException("网段地址包含非法数字: " + parts[i]);
+            }
+            if (v < 0 || v > 255) {
+                throw new RuntimeException("网段地址每段需在 0–255 之间: " + address);
+            }
+            octets[i] = v;
+        }
+        return octets;
+    }
+
+    private long ipv4ToLong(int[] o) {
+        return (((long) o[0] << 24) | ((long) o[1] << 16) | ((long) o[2] << 8) | o[3]) & 0xFFFFFFFFL;
+    }
+
+    private String longToIpv4(long addr) {
+        return ((addr >>> 24) & 0xFF) + "." + ((addr >>> 16) & 0xFF) + "."
+                + ((addr >>> 8) & 0xFF) + "." + (addr & 0xFF);
     }
 
     private String blankToDefault(String value, String defaultValue) {
