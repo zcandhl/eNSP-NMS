@@ -13,7 +13,7 @@
 
 ## 功能概览
 
-- 设备纳管：CRUD、分组、SNMP / ARP 发现，多类型（路由 / 交换 / 防火墙 / AC / AP / 虚拟 PC / 服务器）
+- 设备纳管：CRUD、分组、CIDR 网段扫描（SNMP / ARP 发现），多类型（路由 / 交换 / 防火墙 / AC / AP / 虚拟 PC / 服务器）
 - 监控与告警：SNMP 性能、Ping 兜底、Trap 接收；虚拟 PC 默认仅 Ping
 - 拓扑：LLDP / CDP / ARP 尽力发现与可视化（eNSP 上 LLDP 可能不全）
 - 配置：SSH 备份 / 下发、定时任务、模板
@@ -127,6 +127,15 @@ snmp-agent target-host trap address udp-domain <管理机IP> params securityname
 4. （可选）开启 SSH，供配置备份与 WebSSH  
 
 更细的 LLDP / 私有 MIB 说明见 `docs/` 下相关文档。
+
+## 设备发现与扫描
+
+在「设备管理 → 自动发现」中按网段扫描可纳管设备，扫出后勾选入库：
+
+- **网段写法**：支持 CIDR 掩码，如 `10.20.10.0/24`、`10.20.0.0/16`；只填纯 IP（如 `10.20.10.0`）默认按 `/24` 处理。
+- **扫描上限**：单次最多探测 1024 台主机，可由配置 `nms.discovery.max-hosts`（环境变量 `NMS_DISCOVERY_MAX_HOSTS`）调整；网段过大时拦截并提示，需缩小掩码或拆分成多个网段。
+- **附加探测 IP**：管理地址不在扫描网段内的设备，可用配置 `nms.discovery.extra-ips`（环境变量 `NMS_DISCOVERY_EXTRA_IPS`，逗号分隔）补充探测。
+- **探测方式**：交换机 / 路由器经 SNMP 探测，不可达时 Ping 兜底；虚拟 PC 仅 Ping。
 
 ## 许可证
 
