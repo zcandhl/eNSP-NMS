@@ -87,14 +87,6 @@ public class DataInitializer {
                 userRepository.save(admin);
                 log.info("管理员账号 {} 已初始化，首次登录须修改密码", bootstrapAdminUsername);
             }
-
-            // 既有库中管理员账号未标记强制改密的，补上该标记
-            userRepository.findByUsername(bootstrapAdminUsername).ifPresent(u -> {
-                if (!Boolean.TRUE.equals(u.getMustChangePassword())) {
-                    u.setMustChangePassword(true);
-                    userRepository.save(u);
-                }
-            });
         };
     }
 

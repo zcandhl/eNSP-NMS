@@ -151,7 +151,7 @@ const pwdRules = {
   ]
 }
 
-onMounted(() => {
+onMounted(async () => {
   try {
     const hint = sessionStorage.getItem('ensp_nms_login_hint')
     if (hint) {
@@ -160,6 +160,14 @@ onMounted(() => {
     }
   } catch {
     // ignore
+  }
+  if (auth.isAuthenticated) {
+    // 先以服务端最新状态为准，避免本地缓存的强制改密标记导致重复弹窗
+    try {
+      await auth.fetchMe()
+    } catch {
+      // 会话失效时保留本地状态，交由登录流程处理
+    }
   }
   if (auth.isAuthenticated && auth.user?.mustChangePassword) {
     forceChange.value = true

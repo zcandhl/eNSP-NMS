@@ -75,6 +75,8 @@ public class UserService {
         }
         user.setFailedLoginCount(0);
         user.setLockedUntil(null);
+        // 新建用户首次登录须修改初始口令
+        user.setMustChangePassword(true);
         user.setRoles(resolveRoles(user.getRoles()));
         if (user.getRoles() == null || user.getRoles().isEmpty()) {
             throw new RuntimeException("请至少分配一个角色");
