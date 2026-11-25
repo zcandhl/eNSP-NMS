@@ -1,4 +1,15 @@
-﻿<template>
+﻿/**
+ * @file    TopologyView.vue
+ * @module  视图页/拓扑
+ * @desc    网络拓扑可视化与链路管理页。
+ *
+ * @author  ZC
+ * @date    2026-08-15
+ * @version 1.0.0
+ * @requires @antv/g6, @element-plus/icons-vue, element-plus, vue, vue-router, @/api/device, @/api/topology, @/components/ops-assistant/OpsAssistantPanel, @/composables/askOpsAssistant, @/composables/pageOpsBus, @/composables/useThemeColors, @/composables/webTerminalBus, @/stores/auth, @/stores/project, @/utils/deviceCapabilities, @/utils/topologyHelpers
+ */
+
+<template>
   <div class="topology-container">
     <header class="topo-chrome">
       <div class="topo-cmd">
@@ -59,16 +70,6 @@
               <el-icon :class="{ 'is-loading': refreshingTopology }"><Refresh /></el-icon>
             </button>
           </div>
-
-/**
- * @file    TopologyView.vue
- * @module  视图页/拓扑
- * @desc    网络拓扑可视化与链路管理页。
- *
- * @author  ZC
- * @date    2026-08-15 * @version 1.0.0
- * @requires @antv/g6, @element-plus/icons-vue, element-plus, vue, vue-router, @/api/device, @/api/topology, @/components/ops-assistant/OpsAssistantPanel, @/composables/askOpsAssistant, @/composables/pageOpsBus, @/composables/useThemeColors, @/composables/webTerminalBus, @/stores/auth, @/stores/project, @/utils/deviceCapabilities, @/utils/topologyHelpers
- */
 
           <template v-if="isEditMode && auth.hasPermission('topology:write')">
             <span class="topo-vsep" />

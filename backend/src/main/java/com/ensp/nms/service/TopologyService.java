@@ -261,14 +261,14 @@ public class TopologyService {
         
         // 检查源设备和目标设备是否存在
         if (!deviceRepository.existsById(sourceNodeId)) {
-            throw new RuntimeException("源设备不存在: " + sourceNodeId);
+            throw new IllegalArgumentException("源设备不存在: " + sourceNodeId);
         }
         if (!deviceRepository.existsById(targetNodeId)) {
-            throw new RuntimeException("目标设备不存在: " + targetNodeId);
+            throw new IllegalArgumentException("目标设备不存在: " + targetNodeId);
         }
-        
+
         if (topologyLinkRepository.findBetweenDevices(sourceNodeId, targetNodeId).isPresent()) {
-            throw new RuntimeException("连接已存在");
+            throw new IllegalArgumentException("连接已存在");
         }
         
         TopologyLink link = new TopologyLink();
@@ -294,7 +294,7 @@ public class TopologyService {
     public TopologyLink updateLinkStatus(Long linkId, String status) {
         Optional<TopologyLink> linkOpt = topologyLinkRepository.findById(linkId);
         if (linkOpt.isEmpty()) {
-            throw new RuntimeException("连接不存在");
+            throw new IllegalArgumentException("连接不存在");
         }
 
         TopologyLink link = linkOpt.get();
@@ -310,7 +310,7 @@ public class TopologyService {
     public TopologyLink updateLink(Long linkId, String sourcePort, String targetPort, String bandwidth, String status) {
         Optional<TopologyLink> linkOpt = topologyLinkRepository.findById(linkId);
         if (linkOpt.isEmpty()) {
-            throw new RuntimeException("连接不存在");
+            throw new IllegalArgumentException("连接不存在");
         }
 
         TopologyLink link = linkOpt.get();
